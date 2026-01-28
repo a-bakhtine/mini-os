@@ -1,0 +1,12 @@
+# binaries
+mysh
+*.o
+a.out
+
+# editor stuff
+.vscode/
+*.swp
+*Zone.Identifier*
+
+# extra
+A[0-9]*/

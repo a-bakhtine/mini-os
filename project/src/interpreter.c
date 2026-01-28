@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include "shellmemory.h"
 #include "shell.h"
 
@@ -25,6 +27,7 @@ int print(char *var);
 int source(char *script);
 int echo(char *token);
 int my_ls();
+int my_mkdir(char *token);
 int badcommandFileDoesNotExist();
 
 // Interpret commands and their arguments
@@ -70,10 +73,17 @@ int interpreter(char *command_args[], int args_size) {
         if (args_size != 2)
             return badcommand();
         return echo(command_args[1]);
+
     } else if (strcmp(command_args[0], "my_ls") == 0) {
         if (args_size != 1)
             return badcommand();
         return my_ls();
+
+    } else if (strcmp(command_args[0], "my_mkdir") == 0) {
+        if (args_size != 2)
+            return badcommand();
+        return my_mkdir(command_args[1]);
+        
     } else
         return badcommand();
 }
@@ -88,7 +98,8 @@ set VAR STRING		Assigns a value to shell memory\n \
 print VAR		Displays the STRING assigned to VAR\n \
 source SCRIPT.TXT	Executes the file SCRIPT.TXT\n \
 echo STRING            Display STRING or value of $VAR\n \
-my_ls                  Displays all files present in current directory\n";
+my_ls                  Displays all files present in current directory\n \
+my_mkdir STRING        Creates new directory with name STRING in current directory";
     printf("%s\n", help_string);
     return 0;
 }
@@ -158,20 +169,65 @@ int echo(char *token) {
 }
 
 int my_ls() {
-    const char* dir_path = ".";
     struct dirent **entry;
     int i, scan;
-    scan = scandir(dir_path, &entry, NULL, alphasort);
+    const char* dir_path = ".";
+
+    scan = scandir(dir_path, &entry, NULL, alphasort); // sorts entries alphabetically
     if (scan < 0) {
-        perror("my_ls");
+        perror("my_ls\n");
         return 1;
     }
-    
+
     for (i = 0; i < scan; i++) {
         printf("%s\n", entry[i]->d_name);
         free(entry[i]);
     }
     free(entry);
+
+    return 0;
+}
+
+int is_alphanumeric(const char *s) {
+    int i;
+
+    if (s == NULL || s[0] == '\0') return 0;
+    for (i = 0; s[i] != '\0'; i++) {
+        if (!((s[i] >= '0' && s[i] <= '9') ||
+        (s[i] >= 'A' && s[i] <= 'Z') ||
+        (s[i] >= 'a' && s[i] <= 'z'))) 
+            return 0; // not alphanumeric
+    }
+    return 1; // is alphanum
+}
+
+int badcommand_mkdir() {
+    printf("Bad command: my_mkdir\n");
+    return 1;
+}
+
+int my_mkdir(char *token) {
+    char *dirname = token;
+    
+    // check shell memory for dir name from variable
+    if (dirname[0] == '$') {
+        char *var = dirname + 1;
+        dirname = mem_get_value(var);
+
+        // var DNE
+         if (dirname == NULL || strcmp(dirname, "Variable does not exist") == 0) {
+            return badcommand_mkdir();
+        }      
+    } 
+    if (!is_alphanumeric(dirname)) {
+        return badcommand_mkdir();
+    }
+
+    // full perms for every group
+    if (mkdir(dirname, 0777) != 0) {
+        perror("my_mkdir failed\n");
+        return 1;
+    }
 
     return 0;
 }

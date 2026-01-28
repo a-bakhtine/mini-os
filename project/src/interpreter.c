@@ -252,7 +252,7 @@ int my_mkdir(char *token) {
 int my_touch(char *value) {
     FILE *file;
 
-    if (!(is_alphanumeric(value)))
+    if (!is_alphanumeric(value))
         return badcommand_specific("my_touch");
 
     file = fopen(value, "a");
@@ -264,7 +264,8 @@ int my_touch(char *value) {
 }
 
 int my_cd(char *value) {
-    if (!(is_alphanumeric(value)) || chdir(value) != 0) 
+    if ((!is_alphanumeric(value) && strcmp(".", value) != 0 && 
+    strcmp("..", value) != 0) || chdir(value) != 0) 
         return badcommand_specific("my_cd");
        
     return 0;

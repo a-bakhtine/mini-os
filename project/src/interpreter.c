@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
 #include "shellmemory.h"
 #include "shell.h"
 
@@ -23,6 +24,7 @@ int set(char *var, char *value);
 int print(char *var);
 int source(char *script);
 int echo(char *token);
+int my_ls();
 int badcommandFileDoesNotExist();
 
 // Interpret commands and their arguments
@@ -68,6 +70,10 @@ int interpreter(char *command_args[], int args_size) {
         if (args_size != 2)
             return badcommand();
         return echo(command_args[1]);
+    } else if (strcmp(command_args[0], "my_ls") == 0) {
+        if (args_size != 1)
+            return badcommand();
+        return my_ls();
     } else
         return badcommand();
 }
@@ -81,7 +87,8 @@ quit			Exits / terminates the shell with “Bye!”\n \
 set VAR STRING		Assigns a value to shell memory\n \
 print VAR		Displays the STRING assigned to VAR\n \
 source SCRIPT.TXT	Executes the file SCRIPT.TXT\n \
-echo STRING            Display STRING or value of $VAR\n";
+echo STRING            Display STRING or value of $VAR\n \
+my_ls                  Displays all files present in current directory\n";
     printf("%s\n", help_string);
     return 0;
 }
@@ -147,5 +154,24 @@ int echo(char *token) {
     }
 
     printf("%s\n", token);
+    return 0;
+}
+
+int my_ls() {
+    const char* dir_path = ".";
+    struct dirent **entry;
+    int i, scan;
+    scan = scandir(dir_path, &entry, NULL, alphasort);
+    if (scan < 0) {
+        perror("my_ls");
+        return 1;
+    }
+    
+    for (i = 0; i < scan; i++) {
+        printf("%s\n", entry[i]->d_name);
+        free(entry[i]);
+    }
+    free(entry);
+
     return 0;
 }

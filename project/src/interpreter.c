@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include "shellmemory.h"
@@ -20,6 +21,26 @@ int badcommandFileDoesNotExist() {
     return 3;
 }
 
+int badcommand_specific(char *value) {
+    printf("Bad command: %s\n", value);
+    return 1;
+}
+
+int is_alphanumeric(const char *s) {
+    int i;
+
+    if (s == NULL || s[0] == '\0') 
+        return 0;
+    for (i = 0; s[i] != '\0'; i++) {
+        if (!((s[i] >= '0' && s[i] <= '9') ||
+        (s[i] >= 'A' && s[i] <= 'Z') ||
+        (s[i] >= 'a' && s[i] <= 'z'))) 
+            return 0; // not alphanumeric
+    }
+    return 1; // is alphanum
+}
+
+
 int help();
 int quit();
 int set(char *var, char *value);
@@ -28,6 +49,8 @@ int source(char *script);
 int echo(char *token);
 int my_ls();
 int my_mkdir(char *token);
+int my_touch(char *value);
+int my_cd(char *value);
 int badcommandFileDoesNotExist();
 
 // Interpret commands and their arguments
@@ -83,7 +106,17 @@ int interpreter(char *command_args[], int args_size) {
         if (args_size != 2)
             return badcommand();
         return my_mkdir(command_args[1]);
-        
+
+    } else if (strcmp(command_args[0], "my_touch") == 0) {
+        if (args_size != 2)
+            return badcommand();
+        return my_touch(command_args[1]);
+    
+    } else if (strcmp(command_args[0], "my_cd") == 0) {
+        if (args_size != 2)
+            return badcommand();
+        return my_cd(command_args[1]);
+    
     } else
         return badcommand();
 }
@@ -98,8 +131,10 @@ set VAR STRING		Assigns a value to shell memory\n \
 print VAR		Displays the STRING assigned to VAR\n \
 source SCRIPT.TXT	Executes the file SCRIPT.TXT\n \
 echo STRING            Display STRING or value of $VAR\n \
-my_ls                  Displays all files present in current directory\n \
-my_mkdir STRING        Creates new directory with name STRING in current directory";
+my_ls                  Displays all files present in the current directory\n \
+my_mkdir STRING        Creates new directory with name STRING in the current directory\n \
+my_touch STRING        Creates a new empty file in the current directory\n \
+my_cd STRING           Changes the current directory to directory STRING";
     printf("%s\n", help_string);
     return 0;
 }
@@ -188,24 +223,6 @@ int my_ls() {
     return 0;
 }
 
-int is_alphanumeric(const char *s) {
-    int i;
-
-    if (s == NULL || s[0] == '\0') return 0;
-    for (i = 0; s[i] != '\0'; i++) {
-        if (!((s[i] >= '0' && s[i] <= '9') ||
-        (s[i] >= 'A' && s[i] <= 'Z') ||
-        (s[i] >= 'a' && s[i] <= 'z'))) 
-            return 0; // not alphanumeric
-    }
-    return 1; // is alphanum
-}
-
-int badcommand_mkdir() {
-    printf("Bad command: my_mkdir\n");
-    return 1;
-}
-
 int my_mkdir(char *token) {
     char *dirname = token;
     
@@ -216,11 +233,11 @@ int my_mkdir(char *token) {
 
         // var DNE
          if (dirname == NULL || strcmp(dirname, "Variable does not exist") == 0) {
-            return badcommand_mkdir();
+            return badcommand_specific("my_mkdir");
         }      
     } 
     if (!is_alphanumeric(dirname)) {
-        return badcommand_mkdir();
+        return badcommand_specific("my_mkdir");
     }
 
     // full perms for every group
@@ -231,3 +248,25 @@ int my_mkdir(char *token) {
 
     return 0;
 }
+
+int my_touch(char *value) {
+    FILE *file;
+
+    if (!(is_alphanumeric(value)))
+        return badcommand_specific("my_touch");
+
+    file = fopen(value, "a");
+    if (file == NULL) 
+        return badcommand_specific("my_touch"); 
+
+    fclose(file);
+    return 0;
+}
+
+int my_cd(char *value) {
+    if (!(is_alphanumeric(value)) || chdir(value) != 0) 
+        return badcommand_specific("my_cd");
+       
+    return 0;
+}
+

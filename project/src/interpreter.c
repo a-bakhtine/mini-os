@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include "shellmemory.h"
 #include "shell.h"
 
@@ -51,6 +52,7 @@ int my_ls();
 int my_mkdir(char *token);
 int my_touch(char *value);
 int my_cd(char *value);
+int run(char *command_args[], int args_size);
 int badcommandFileDoesNotExist();
 
 // Interpret commands and their arguments
@@ -116,6 +118,11 @@ int interpreter(char *command_args[], int args_size) {
         if (args_size != 2)
             return badcommand();
         return my_cd(command_args[1]);
+
+    } else if (strcmp(command_args[0], "run") == 0) {
+        if (args_size < 2)
+            return badcommand();
+        return run(command_args, args_size);
     
     } else
         return badcommand();
@@ -134,7 +141,8 @@ echo STRING            Display STRING or value of $VAR\n \
 my_ls                  Displays all files present in the current directory\n \
 my_mkdir STRING        Creates new directory with name STRING in the current directory\n \
 my_touch STRING        Creates a new empty file in the current directory\n \
-my_cd STRING           Changes the current directory to directory STRING";
+my_cd STRING           Changes the current directory to directory STRING\n \
+run COMMAND            Run command to perform testcases";
     printf("%s\n", help_string);
     return 0;
 }
@@ -271,3 +279,34 @@ int my_cd(char *value) {
     return 0;
 }
 
+int run(char *command_args[], int args_size) {
+    // argv[0] = program name
+    char *argv[args_size];  
+    int i, status;
+    pid_t pid;
+
+    for (i = 1; i < args_size; i++) {
+        argv[i - 1] = command_args[i];
+    }
+    argv[args_size - 1] = NULL;
+
+    pid = fork();
+
+    // fork failure
+    if (pid < 0) {
+        return badcommand_specific("run");
+    }
+
+    if (pid == 0) {
+        // child: replace process w/ desired program
+        execvp(argv[0], argv);
+
+        // execvp failure
+        exit(1);
+    } else {
+        // parent: waits for child to finish
+        waitpid(pid, &status, 0);
+        return 0;
+    }
+
+}

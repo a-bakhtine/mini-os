@@ -217,10 +217,9 @@ int my_ls() {
     const char* dir_path = ".";
 
     scan = scandir(dir_path, &entry, NULL, alphasort); // sorts entries alphabetically
-    if (scan < 0) {
-        perror("my_ls\n");
+    if (scan < 0) 
         return 1;
-    }
+    
 
     for (i = 0; i < scan; i++) {
         printf("%s\n", entry[i]->d_name);
@@ -250,7 +249,6 @@ int my_mkdir(char *token) {
 
     // full perms for every group
     if (mkdir(dirname, 0777) != 0) {
-        perror("my_mkdir failed\n");
         return 1;
     }
 
@@ -299,7 +297,8 @@ int run(char *command_args[], int args_size) {
 
     if (pid == 0) {
         // child: replace process w/ desired program
-        execvp(argv[0], argv);
+        if (execvp(argv[0], argv) < 0) // error catch
+             _exit(1); 
 
         // execvp failure
         exit(1);

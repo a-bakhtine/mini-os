@@ -11,6 +11,7 @@ int parseInput(char ui[]);
 // Start of everything
 int main(int argc, char *argv[]) {
     printf("Shell version 1.5 created Dec 2025\n");
+    fflush(stdout);
 
     char prompt = '$';  				// Shell prompt
     char userInput[MAX_USER_INPUT];		// user's input stored here
@@ -71,7 +72,7 @@ int parseInput(char inp[]) {
     int lastError;
     char lineCopy[1001];
     char *cmd;
-    int count;
+    int i;
 
     lastError = 0;
     
@@ -81,13 +82,13 @@ int parseInput(char inp[]) {
 
     // splits on semi colons
     cmd = strtok(lineCopy, ";");
-    count = 0;
+    i = 0;
 
     // assume @ most 10 chained instructions
-    while (cmd != NULL && count < 10) { 
+    while (cmd != NULL && i < 10) { 
         lastError = parseOneCommand(cmd);
         cmd = strtok(NULL, ";");
-        count++;
+        i++;
     }
 
     return lastError;

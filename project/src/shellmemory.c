@@ -22,7 +22,6 @@ int match(char *model, char *var) {
 }
 
 // Shell memory functions
-
 void mem_init(){
     int i;
     for (i = 0; i < MEM_SIZE; i++){		

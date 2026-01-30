@@ -6,6 +6,7 @@
 #include "interpreter.h"
 #include "shellmemory.h"
 
+int parseOneCommand(char ui[]);
 int parseInput(char ui[]);
 
 // Start of everything
@@ -46,6 +47,7 @@ int wordEnding(char c) {
     return c == '\0' || c == '\n' || c == ' ';
 }
 
+// parses one command from input
 int parseOneCommand(char inp[]) {
     char tmp[200], *words[100];                            
     int ix = 0, w = 0;
@@ -68,6 +70,7 @@ int parseOneCommand(char inp[]) {
 
 }
 
+// parses full input line that may contain chained commands (sep by ;)
 int parseInput(char inp[]) {
     int lastError;
     char lineCopy[1001];

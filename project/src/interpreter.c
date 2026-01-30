@@ -196,12 +196,14 @@ int source(char *script) {
     return errCode;
 }
 
+// prints a token followed by a newline
 int echo(char *token) {
     // check shell memory for a var with the following name after $
     if (token[0] == '$') {
         char *var = token + 1; // skip "$"
-        token = mem_get_value(var);
+        token = mem_get_value(var); 
         
+        // no variable following variable prompt
         if (strcmp(token, "Variable does not exist") == 0) {
             token = ""; // echo prints blank line for missing var
         }         
@@ -211,16 +213,19 @@ int echo(char *token) {
     return 0;
 }
 
+// lists directory entries in curr directory in alphabetical order
 int my_ls() {
     struct dirent **entry;
     int i, scan;
     const char* dir_path = ".";
 
-    scan = scandir(dir_path, &entry, NULL, alphasort); // sorts entries alphabetically
+    // allocates array of dirent* and each dirent* & sort alphabetically
+    scan = scandir(dir_path, &entry, NULL, alphasort); 
+    // error
     if (scan < 0) 
         return 1;
     
-
+    // print each filename on its own line, then free the allocated slot
     for (i = 0; i < scan; i++) {
         printf("%s\n", entry[i]->d_name);
         free(entry[i]);
@@ -230,6 +235,7 @@ int my_ls() {
     return 0;
 }
 
+// creates directory with given name / var value
 int my_mkdir(char *token) {
     char *dirname = token;
     
@@ -243,11 +249,12 @@ int my_mkdir(char *token) {
             return badcommand_specific("my_mkdir");
         }      
     } 
+
     if (!is_alphanumeric(dirname)) {
         return badcommand_specific("my_mkdir");
     }
 
-    // full perms for every group
+    // full perms for every group and check for error
     if (mkdir(dirname, 0777) != 0) {
         return 1;
     }
@@ -255,13 +262,16 @@ int my_mkdir(char *token) {
     return 0;
 }
 
+// creates file if DNE / updates "last modified" time if exists
 int my_touch(char *value) {
     FILE *file;
 
     if (!is_alphanumeric(value))
         return badcommand_specific("my_touch");
 
+    // open file to create it
     file = fopen(value, "a");
+    // check error
     if (file == NULL) 
         return badcommand_specific("my_touch"); 
 
@@ -269,7 +279,9 @@ int my_touch(char *value) {
     return 0;
 }
 
+// changes current working directory
 int my_cd(char *value) {
+    // must be alphanumeric directory and check if error in entering directory
     if ((!is_alphanumeric(value) && strcmp(".", value) != 0 && 
     strcmp("..", value) != 0) || chdir(value) != 0) 
         return badcommand_specific("my_cd");
@@ -277,12 +289,14 @@ int my_cd(char *value) {
     return 0;
 }
 
+// executes external program in child process
 int run(char *command_args[], int args_size) {
-    // argv[0] = program name
-    char *argv[args_size];  
+    char *argv[args_size];  // max possible entries 
     int i, status;
     pid_t pid;
-
+    
+    // argv[0] = program name
+    // build argv for execvp -> skip run cmd and null-terminator
     for (i = 1; i < args_size; i++) {
         argv[i - 1] = command_args[i];
     }
@@ -290,17 +304,16 @@ int run(char *command_args[], int args_size) {
 
     pid = fork();
 
-    // fork failure
-    if (pid < 0) {
+    // fork error (can't make child process)
+    if (pid < 0)
         return badcommand_specific("run");
-    }
 
     if (pid == 0) {
         // child: replace process w/ desired program
         if (execvp(argv[0], argv) < 0) // error catch
              _exit(1); 
 
-        // execvp failure
+        // execvp error
         exit(1);
     } else {
         // parent: waits for child to finish

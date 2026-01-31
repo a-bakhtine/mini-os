@@ -60,12 +60,19 @@ int parseOneCommand(char inp[]) {
             tmp[wordlen] = inp[ix];                        
         }
         tmp[wordlen] = '\0';
-        words[w] = strdup(tmp);
+        words[w] = strdup(tmp); // dupe word onto heap
         w++;
-        if (inp[ix] == '\0') break;
+        if (inp[ix] == '\0') break; // if end of string
         ix++; 
     }
     errorCode = interpreter(words, w);
+
+    // avoid memory leak
+    for (int j = 0; j < w; j++) {
+        free(words[j]);
+    }
+
+
     return errorCode;
 
 }

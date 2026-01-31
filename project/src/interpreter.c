@@ -153,14 +153,6 @@ int quit() {
 }
 
 int set(char *var, char *value) {
-    // Challenge: allow setting VAR to the rest of the input line,
-    // possibly including spaces.
-
-    // Hint: Since "value" might contain multiple tokens, you'll need to loop
-    // through them, concatenate each token to the buffer, and handle spacing
-    // appropriately. Investigate how `strcat` works and how you can use it
-    // effectively here.
-
     mem_set_value(var, value);
     return 0;
 }

@@ -8,6 +8,9 @@
 #include <sys/wait.h>
 #include "shellmemory.h"
 #include "shell.h"
+#include "pcb.h"
+#include "readyqueue.h"
+#include "scheduler.h"
 
 int MAX_ARGS_SIZE = 3;
 
@@ -17,7 +20,7 @@ int badcommand() {
 }
 
 // For source command only
-int badcommandFileDoesNotExist() {
+int badcommand_file_DNE() {
     printf("Bad command: File not found\n");
     return 3;
 }
@@ -53,7 +56,7 @@ int my_mkdir(char *token);
 int my_touch(char *value);
 int my_cd(char *value);
 int run(char *command_args[], int args_size);
-int badcommandFileDoesNotExist();
+int badcommand_file_DNE();
 
 // Interpret commands and their arguments
 int interpreter(char *command_args[], int args_size) {
@@ -164,26 +167,33 @@ int print(char *var) {
 }
 
 int source(char *script) {
+    int start, scriptLength, load_status;
+    PCB *proc;
     int errCode = 0;
-    char line[MAX_USER_INPUT];
-    FILE *p = fopen(script, "rt");      // the program is in a file
+    FILE *p = fopen(script, "rt");
+    
+    if (p == NULL)
+        return badcommand_file_DNE();
 
-    if (p == NULL) {
-        return badcommandFileDoesNotExist();
-    }
-
-    fgets(line, MAX_USER_INPUT - 1, p);
-    while (1) {
-        errCode = parseInput(line);     // which calls interpreter()
-        memset(line, 0, sizeof(line));
-
-        if (feof(p)) {
-            break;
-        }
-        fgets(line, MAX_USER_INPUT - 1, p);
-    }
-
+    load_status = load_script_lines(p, &start, &scriptLength);
     fclose(p);
+    if (load_status != 0) 
+        return load_status;
+
+    proc = pcb_create(start, scriptLength);
+    if (proc == NULL) { // error
+        release_script_lines(start, scriptLength);
+        return -1;
+    }
+
+    // init and setup readyqueue
+    rq_init();
+    rq_enqueue(proc);
+
+    run_fcfs(); // first come first serve scheduler for script
+
+    // remove script code from mem
+    release_script_lines(start, scriptLength);
 
     return errCode;
 }

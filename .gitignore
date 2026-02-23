@@ -11,3 +11,4 @@ a.out
 # extra
 A[0-9]*/
 testfile.txt
+prog[0-9]*.txt

@@ -8,8 +8,9 @@
 // policy string -> enum
 Policy parse_policy(const char *s) {
     if (strcmp(s, "FCFS") == 0) return FCFS;
-    if (strcmp(s, "SJF")  == 0) return SJF;
-    if (strcmp(s, "RR")   == 0) return RR;
+    if (strcmp(s, "SJF") == 0) return SJF;
+    if (strcmp(s, "RR") == 0) return RR;
+    if (strcmp(s, "RR30") == 0) return RR30;
     if (strcmp(s, "AGING")== 0) return AGING;
     return INVALID;
 }
@@ -140,6 +141,9 @@ void run_scheduler(Policy policy) {
             break;
         case RR:
             run_rr(2);
+            break;
+        case RR30:
+            run_rr(30);
             break;
         case AGING:
             run_aging();

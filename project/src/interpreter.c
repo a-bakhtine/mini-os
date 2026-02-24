@@ -330,6 +330,7 @@ int run(char *command_args[], int args_size) {
 }
 
 void cleanup_loaded_scripts(int frame_starts[], int frame_lens[], PCB *pcbs[], int scripts_loaded, int total) {
+    rq_init();
     // release script mem
     for (int i = scripts_loaded - 1; i >= 0; i--)
         release_script_lines(frame_starts[i], frame_lens[i]);
@@ -344,6 +345,7 @@ int exec(char *command_args[], int args_size) {
     if (policy == INVALID)
         return 1;
 
+    rq_init();
     // parse script names (between 1st arg and last)
     int script_count = args_size - 2;
     char *script_names[3];

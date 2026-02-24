@@ -40,6 +40,7 @@ void run_fcfs() {
             p->pc++;
         }
         
+        release_script_lines(p->start, p->scriptLength)
         pcb_destroy(p);
     }
 }
@@ -61,6 +62,8 @@ void run_sjf() {
             if (line != NULL && strlen(line) > 0) parseInput(line);
             p->pc++;
         }
+
+        release_script_lines(p->start, p->scriptLength)
         pcb_destroy(p);
     }
 }
@@ -88,6 +91,7 @@ void run_rr(int time_quantum) {
 
         // process finishes, free it
         if (p->pc >= end) {
+            release_script_lines(p->start, p->scriptLength)
             pcb_destroy(p);
         } 
         // quantum expired, so requeue for next turn
@@ -118,6 +122,7 @@ void run_aging() {
 
         // check if process finished, if yes free it
         if (p->pc >= end) {
+            release_script_lines(p->start, p->scriptLength)
             pcb_destroy(p);
         } 
         // else decrement scores of all waiting processes (if not 0 score)

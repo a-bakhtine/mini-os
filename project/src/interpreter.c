@@ -196,9 +196,6 @@ int source(char *script) {
     // FCFS scheduler
     run_scheduler(FCFS);
 
-    // remove script code from mem
-    release_script_lines(start, scriptLength);
-
     return 0;
 }
 
@@ -409,10 +406,6 @@ int exec(char *command_args[], int args_size) {
 
     // all scripts loaded, pass to scheduler
     run_scheduler(policy);
-
-    // release script memory 
-    for (int i = script_count - 1; i >= 0; i--)
-        release_script_lines(frame_starts[i], frame_lens[i]);
 
     return 0;
 }

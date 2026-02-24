@@ -12,7 +12,7 @@
 #include "readyqueue.h"
 #include "scheduler.h"
 
-int MAX_ARGS_SIZE = 3;
+int MAX_ARGS_SIZE = 5;
 
 int badcommand() {
     printf("Unknown Command\n");
@@ -56,6 +56,7 @@ int my_mkdir(char *token);
 int my_touch(char *value);
 int my_cd(char *value);
 int run(char *command_args[], int args_size);
+int exec(char *command_args[], int args_size);
 int badcommand_file_DNE();
 
 // Interpret commands and their arguments
@@ -126,7 +127,10 @@ int interpreter(char *command_args[], int args_size) {
         if (args_size < 2)
             return badcommand();
         return run(command_args, args_size);
-    
+    } else if (strcmp(command_args[0], "exec") == 0) {
+        if (args_size < 3 || args_size > 5)
+            return badcommand();
+        return exec(command_args, args_size);
     } else
         return badcommand();
 }
@@ -169,7 +173,6 @@ int print(char *var) {
 int source(char *script) {
     int start, scriptLength, load_status;
     PCB *proc;
-    int errCode = 0;
     FILE *p = fopen(script, "rt");
     
     if (p == NULL)
@@ -183,19 +186,19 @@ int source(char *script) {
     proc = pcb_create(start, scriptLength);
     if (proc == NULL) { // error
         release_script_lines(start, scriptLength);
-        return -1;
+        return 1;
     }
 
     // init and setup readyqueue
-    rq_init();
     rq_enqueue(proc);
 
-    run_fcfs(); // first come first serve scheduler for script
+    // FCFS scheduler
+    run_scheduler(FCFS);
 
     // remove script code from mem
     release_script_lines(start, scriptLength);
 
-    return errCode;
+    return 0;
 }
 
 // prints a token followed by a newline
@@ -323,4 +326,84 @@ int run(char *command_args[], int args_size) {
         return 0;
     }
 
+}
+
+void cleanup_loaded_scripts(int frame_starts[], int frame_lens[], PCB *pcbs[], int scripts_loaded, int total) {
+    // release script mem
+    for (int i = scripts_loaded - 1; i >= 0; i--)
+        release_script_lines(frame_starts[i], frame_lens[i]);
+    // destroy any created PCBs 
+    for (int i = 0; i < total; i++)
+        if (pcbs[i]) pcb_destroy(pcbs[i]);
+}
+
+int exec(char *command_args[], int args_size) {
+    // parse policy (last argument)
+    Policy policy = parse_policy(command_args[args_size - 1]);
+    if (policy == INVALID)
+        return 1;
+
+    // parse script names (between 1st arg and last)
+    int script_count = args_size - 2;
+    char *script_names[3];
+    for (int i = 0; i < script_count; i++)
+        script_names[i] = command_args[1 + i];
+
+    // check for duplicate script names 
+    for (int i = 0; i < script_count; i++) {
+        for (int j = i + 1; j < script_count; j++) {
+            if (strcmp(script_names[i], script_names[j]) == 0)
+                return 1;
+        }
+    }
+
+    // track loaded scripts (to cleanup if fail)
+    int frame_starts[3] = {0};
+    int frame_lens[3] = {0};
+    PCB *pcbs[3] = {NULL};
+    int scripts_loaded = 0;
+
+    // load each script into memory, create its PCB, enqueue
+    for (int i = 0; i < script_count; i++) {
+        FILE *script_file = fopen(script_names[i], "rt");
+        
+        // check if file found
+        if (!script_file) {
+            cleanup_loaded_scripts(frame_starts, frame_lens, pcbs, scripts_loaded, script_count);
+            return 1; 
+        }
+
+        int frame_start, frame_len;
+        int load_result = load_script_lines(script_file, &frame_start, &frame_len);
+        fclose(script_file);
+
+        // check if enough memory / load errors
+        if (load_result != 0) {
+            cleanup_loaded_scripts(frame_starts, frame_lens, pcbs, scripts_loaded, script_count);
+            return 1; 
+        }
+
+        frame_starts[i] = frame_start;
+        frame_lens[i] = frame_len;
+        scripts_loaded++;
+
+        pcbs[i] = pcb_create(frame_start, frame_len);
+        // check if PCB allocation worked
+        if (!pcbs[i]) {
+            cleanup_loaded_scripts(frame_starts, frame_lens, pcbs, scripts_loaded, script_count);
+            return 1; 
+        }
+
+        // enqueue
+        rq_enqueue(pcbs[i]);
+    }
+
+    // all scripts loaded, pass to scheduler
+    run_scheduler(policy);
+
+    // release script memory 
+    for (int i = script_count - 1; i >= 0; i--)
+        release_script_lines(frame_starts[i], frame_lens[i]);
+
+    return 0;
 }

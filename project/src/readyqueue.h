@@ -10,4 +10,7 @@ void rq_enqueue(PCB *p);
 PCB *rq_dequeue();
 PCB *rq_peek();
 
+void rq_enqueue_sjf(PCB *p);
+
+
 #endif

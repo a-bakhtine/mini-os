@@ -149,7 +149,8 @@ my_ls                  Displays all files present in the current directory\n \
 my_mkdir STRING        Creates new directory with name STRING in the current directory\n \
 my_touch STRING        Creates a new empty file in the current directory\n \
 my_cd STRING           Changes the current directory to directory STRING\n \
-run COMMAND            Run command to perform testcases";
+run COMMAND            Run command to perform testcases\n \
+exec p1 p2 p3 POLICY   Runs multiple processes (1-3) concurrently with given POLICY";
     printf("%s\n", help_string);
     return 0;
 }
@@ -395,7 +396,11 @@ int exec(char *command_args[], int args_size) {
         }
 
         // enqueue
-        rq_enqueue(pcbs[i]);
+        if (policy == SJF) {
+            rq_enqueue_sjf(pcbs[i]);
+        } else {
+            rq_enqueue(pcbs[i]);
+        }
     }
 
     // all scripts loaded, pass to scheduler

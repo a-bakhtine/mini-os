@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
            break; 
         }
         errorCode = parseInput(userInput);
-        if (errorCode = -1) exit(99);	// ignore all other errors
+        if (errorCode == -1) exit(99);	// ignore all other errors
         memset(userInput, 0, sizeof(userInput));
     }
 

@@ -39,11 +39,30 @@ void run_fcfs() {
     }
 }
 
+// running shortest scrit first
+void run_sjf() {
+    while (!rq_is_empty()) {
+        PCB *p = rq_dequeue();
+        if (p == NULL) break;
+
+        int end = p->start + p->scriptLength;
+        while (p->pc < end) {
+            char *line = get_script_line(p->pc);
+            if (line != NULL && strlen(line) > 0) parseInput(line);
+            p->pc++;
+        }
+        pcb_destroy(p);
+    }
+}
+
 // based on policy use correct scheduling algo.
 void run_scheduler(Policy policy) {
     switch (policy) {
         case FCFS:
             run_fcfs();
+            break;
+        case SJF:
+            run_sjf();
             break;
         default:
             break;

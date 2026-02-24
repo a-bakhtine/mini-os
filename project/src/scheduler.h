@@ -1,6 +1,15 @@
 #ifndef SCHEDULER_H
 #define SCHEDULER_H
 
-void run_fcfs();
+typedef enum {
+    FCFS,
+    SJF,
+    RR,
+    AGING,
+    INVALID
+} Policy;
+
+Policy parse_policy(const char *s);
+void run_scheduler(Policy policy);
 
 #endif

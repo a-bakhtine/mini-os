@@ -6,11 +6,11 @@
 typedef struct PCB {
     int pid;
 
-    int start; // start index in script_store
-    int scriptLength; // number of lines in this script
+    int start; // start index of script_store
+    int scriptLength; // # of lines 
     int pc; // index of next instruction (starts at start)
-
-    struct PCB *next;   // link for ready queue
+    int score; // job lenth of score for AGING scheduler
+    struct PCB *next; // link for ready queue
 } PCB;
 
 PCB *pcb_create(int start, int scriptLength);

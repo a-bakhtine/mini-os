@@ -11,6 +11,7 @@ PCB *pcb_create(int start, int scriptLength) {
     p->start = start;
     p->scriptLength = scriptLength;
     p->pc = start;
+    p->score = p->scriptLength;
 
     p->next = NULL;
 

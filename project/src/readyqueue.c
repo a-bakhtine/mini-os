@@ -35,6 +35,8 @@ void rq_enqueue(PCB *p) {
 
 // sorted enqueue for SJF
 void rq_enqueue_sjf(PCB *p) {
+    PCB *curr;
+
     if (p == NULL) 
         return;
     p->next = NULL;
@@ -53,25 +55,64 @@ void rq_enqueue_sjf(PCB *p) {
     }
 
     // else search for where to insert
-    PCB *cur = rq_head;
-    while (cur->next != NULL && cur->next->scriptLength <= p->scriptLength) {
-        cur = cur->next;
+    curr = rq_head;
+    while (curr->next != NULL && curr->next->scriptLength <= p->scriptLength) {
+        curr = curr->next;
     }
 
-    p->next = cur->next;
-    cur->next = p;
+    p->next = curr->next;
+    curr->next = p;
 
     // if added to end update tail 
     if (p->next == NULL) 
         rq_tail = p;
 }
 
+// sorted enqueue by score (lowest score = highest priority)
+// for aging scheduler
+void rq_enqueue_score(PCB *p) {
+    PCB *curr;
+
+    if (!p)
+        return;
+    p->next = NULL;
+
+    // empty queue
+    if (rq_head == NULL) { 
+        rq_head = rq_tail = p; 
+        return; 
+    }
+
+    // new node has lowest score = highest priority, insert @ front
+    if (p->score < rq_head->score) {
+        p->next = rq_head;
+        rq_head = p;
+        return;
+    }
+
+    // iterate thru nodes until next node has higher score, then insert
+    curr = rq_head;
+    while (curr->next != NULL && curr->next->score <= p->score) {
+        curr = curr->next;
+    }
+
+    p->next = curr->next;
+    curr->next = p;
+
+    // update tail if inserted @ back
+    if (p->next == NULL) 
+        rq_tail = p;
+
+}
+
 // remove and return process @front of queue
 PCB *rq_dequeue() {
+    PCB *p;
+
     if (rq_head == NULL)
         return NULL;
 
-    PCB *p = rq_head;
+    p = rq_head;
     rq_head = rq_head->next;
 
     // check if queue empty
@@ -84,5 +125,14 @@ PCB *rq_dequeue() {
 
 PCB *rq_peek() {
     return rq_head;
+}
+
+// age all PCBs that are waiting (for running AGING scheduler)
+void rq_age_all() {
+    PCB *curr;
+    for (curr = rq_head; curr != NULL; curr = curr->next) {
+        if (curr->score > 0)
+            curr->score--;
+    }
 }
 

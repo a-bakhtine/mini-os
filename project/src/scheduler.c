@@ -26,7 +26,7 @@ void run_fcfs() {
         if (p == NULL)
             break;
             
-        // end is one past last line index
+        // end is 1 past last line index
         end = p->start + p->scriptLength;
 
         while (p->pc < end) {
@@ -53,7 +53,7 @@ void run_sjf() {
         p = rq_dequeue();
         if (p == NULL) break;
 
-        // end is one past last line index
+        // end is 1 past last line index
         end = p->start + p->scriptLength;
         while (p->pc < end) {
             line = get_script_line(p->pc);
@@ -96,6 +96,39 @@ void run_rr(int time_quantum) {
     }
 }
 
+void run_aging() {
+    int end;
+    char *line;
+    PCB *p;
+
+    while (!rq_is_empty()) {
+        p = rq_dequeue();
+        if (!p) break;
+
+        // end is 1 past last line index
+        end = p->start + p->scriptLength;
+
+        // run 1 instruction from curr process
+        if (p->pc < end) {
+            line = get_script_line(p->pc);
+            if (line && strlen(line) > 0) parseInput(line);
+            p->pc++;
+        }
+
+        // check if process finished, if yes free it
+        if (p->pc >= end) {
+            pcb_destroy(p);
+        } 
+        // else decrement scores of all waiting processes (if not 0 score)
+        // and reinsert curr process into queue sorted by score
+        else {
+            if (p->score > 0)
+                rq_age_all();
+            rq_enqueue_score(p);
+        }
+    }
+}
+
 // based on policy use correct scheduling algo.
 void run_scheduler(Policy policy) {
     switch (policy) {
@@ -107,6 +140,9 @@ void run_scheduler(Policy policy) {
             break;
         case RR:
             run_rr(2);
+            break;
+        case AGING:
+            run_aging();
             break;
         default:
             break;

@@ -398,6 +398,8 @@ int exec(char *command_args[], int args_size) {
         // enqueue
         if (policy == SJF) {
             rq_enqueue_sjf(pcbs[i]);
+        } else if (policy == AGING) {
+            rq_enqueue_score(pcbs[i]);
         } else {
             rq_enqueue(pcbs[i]);
         }

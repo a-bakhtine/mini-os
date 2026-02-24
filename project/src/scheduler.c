@@ -16,17 +16,21 @@ Policy parse_policy(const char *s) {
 
 // run all enqueued process to completion in arrival order
 void run_fcfs() {
+    int end;
+    char *line;
+    PCB *p;
+
     while (!rq_is_empty()) {
 
-        PCB *p = rq_dequeue();
+        p = rq_dequeue();
         if (p == NULL)
             break;
             
-        // one past last line index
-        int end = p->start + p->scriptLength;
+        // end is one past last line index
+        end = p->start + p->scriptLength;
 
         while (p->pc < end) {
-            char *line = get_script_line(p->pc);
+            line = get_script_line(p->pc);
             
             // skip null lines
             if (line != NULL && strlen(line) > 0) {
@@ -41,17 +45,54 @@ void run_fcfs() {
 
 // running shortest scrit first
 void run_sjf() {
+    int end;
+    char *line;
+    PCB *p;
+
     while (!rq_is_empty()) {
-        PCB *p = rq_dequeue();
+        p = rq_dequeue();
         if (p == NULL) break;
 
-        int end = p->start + p->scriptLength;
+        // end is one past last line index
+        end = p->start + p->scriptLength;
         while (p->pc < end) {
-            char *line = get_script_line(p->pc);
+            line = get_script_line(p->pc);
             if (line != NULL && strlen(line) > 0) parseInput(line);
             p->pc++;
         }
         pcb_destroy(p);
+    }
+}
+
+void run_rr(int time_quantum) {
+    int end, lines_executed;
+    char *line;
+    PCB *p;
+
+    while (!rq_is_empty()) {
+        p = rq_dequeue();
+        if (p == NULL) break;
+
+        // end is one past last line index
+        end = p->start + p->scriptLength;
+        lines_executed = 0;
+
+        // run up to time_quantum lines of this process
+        while (p->pc < end && lines_executed < time_quantum) {
+            line = get_script_line(p->pc);
+            if (line != NULL && strlen(line) > 0) parseInput(line);
+            p->pc++;
+            lines_executed++;
+        }
+
+        // process finishes, free it
+        if (p->pc >= end) {
+            pcb_destroy(p);
+        } 
+        // quantum expired, so requeue for next turn
+        else {
+            rq_enqueue(p);
+        }
     }
 }
 
@@ -63,6 +104,9 @@ void run_scheduler(Policy policy) {
             break;
         case SJF:
             run_sjf();
+            break;
+        case RR:
+            run_rr(2);
             break;
         default:
             break;

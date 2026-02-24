@@ -14,9 +14,9 @@ int main(int argc, char *argv[]) {
     printf("Shell version 1.5 created Dec 2025\n");
     fflush(stdout);
 
-    char prompt = '$';  				// Shell prompt
-    char userInput[MAX_USER_INPUT];		// user's input stored here
-    int errorCode = 0;					// zero means no error, default
+    char prompt = '$'; // shell prompt
+    char userInput[MAX_USER_INPUT]; // user's input stored here
+    int errorCode = 0; // zero means no error, default
 
     //init user input
     for (int i = 0; i < MAX_USER_INPUT; i++) {
@@ -25,6 +25,7 @@ int main(int argc, char *argv[]) {
     
     //init shell memory
     mem_init();
+    rq_init();
     int mode = isatty(STDIN_FILENO); // 1 terminal, 0 else
     while(1) {							
         if (mode) {

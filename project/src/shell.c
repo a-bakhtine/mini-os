@@ -5,11 +5,12 @@
 #include "shell.h"
 #include "interpreter.h"
 #include "shellmemory.h"
+#include "readyqueue.h"
 
 int parseOneCommand(char ui[]);
 int parseInput(char ui[]);
 
-// Start of everything
+// start of everything
 int main(int argc, char *argv[]) {
     printf("Shell version 1.5 created Dec 2025\n");
     fflush(stdout);
@@ -37,7 +38,7 @@ int main(int argc, char *argv[]) {
            break; 
         }
         errorCode = parseInput(userInput);
-        if (errorCode == -1) exit(99);	// ignore all other errors
+        if (errorCode = -1) exit(99);	// ignore all other errors
         memset(userInput, 0, sizeof(userInput));
     }
 

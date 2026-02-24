@@ -5,6 +5,17 @@
 #include "pcb.h"
 #include "interpreter.h"
 
+int scheduler_active = 0;
+Policy scheduler_policy = INVALID;
+
+int scheduler_is_active() { 
+    return scheduler_active; 
+}
+
+Policy scheduler_get_policy() { 
+    return scheduler_policy; 
+}
+
 // policy string -> enum
 Policy parse_policy(const char *s) {
     if (strcmp(s, "FCFS") == 0) return FCFS;
@@ -40,7 +51,7 @@ void run_fcfs() {
             p->pc++;
         }
         
-        release_script_lines(p->start, p->scriptLength)
+        release_script_lines(p->start, p->scriptLength);
         pcb_destroy(p);
     }
 }
@@ -59,11 +70,12 @@ void run_sjf() {
         end = p->start + p->scriptLength;
         while (p->pc < end) {
             line = get_script_line(p->pc);
-            if (line != NULL && strlen(line) > 0) parseInput(line);
+            if (line != NULL && strlen(line) > 0) 
+                parseInput(line);
             p->pc++;
         }
 
-        release_script_lines(p->start, p->scriptLength)
+        release_script_lines(p->start, p->scriptLength);
         pcb_destroy(p);
     }
 }
@@ -91,7 +103,7 @@ void run_rr(int time_quantum) {
 
         // process finishes, free it
         if (p->pc >= end) {
-            release_script_lines(p->start, p->scriptLength)
+            release_script_lines(p->start, p->scriptLength);
             pcb_destroy(p);
         } 
         // quantum expired, so requeue for next turn
@@ -122,7 +134,7 @@ void run_aging() {
 
         // check if process finished, if yes free it
         if (p->pc >= end) {
-            release_script_lines(p->start, p->scriptLength)
+            release_script_lines(p->start, p->scriptLength);
             pcb_destroy(p);
         } 
         // else decrement scores of all waiting processes (if not 0 score)
@@ -137,6 +149,9 @@ void run_aging() {
 
 // based on policy use correct scheduling algo.
 void run_scheduler(Policy policy) {
+    scheduler_active = 1;
+    scheduler_policy = policy;
+
     switch (policy) {
         case FCFS:
             run_fcfs();
@@ -156,4 +171,7 @@ void run_scheduler(Policy policy) {
         default:
             break;
     }
+
+    scheduler_active = 0;
+    scheduler_policy = INVALID;
 }

@@ -12,7 +12,7 @@
 #include "readyqueue.h"
 #include "scheduler.h"
 
-int MAX_ARGS_SIZE = 5;
+int MAX_ARGS_SIZE = 7;
 
 int badcommand() {
     printf("Unknown Command\n");
@@ -128,7 +128,7 @@ int interpreter(char *command_args[], int args_size) {
             return badcommand();
         return run(command_args, args_size);
     } else if (strcmp(command_args[0], "exec") == 0) {
-        if (args_size < 3 || args_size > 5)
+        if (args_size < 3 || args_size > 7)
             return badcommand();
         return exec(command_args, args_size);
     } else
@@ -337,14 +337,26 @@ void cleanup_loaded_scripts(int frame_starts[], int frame_lens[], PCB *pcbs[], i
 }
 
 int exec(char *command_args[], int args_size) {
+    int background = (strcmp(command_args[args_size - 1], "#") == 0);
+    int policy_index = background ? args_size - 2 : args_size - 1;
+
     // parse policy (last argument)
-    Policy policy = parse_policy(command_args[args_size - 1]);
+    Policy policy = parse_policy(command_args[policy_index]);
     if (policy == INVALID)
         return 1;
 
-    rq_init();
+    // nested execs use same policy as running one
+    int scheduler_active = scheduler_is_active();
+    if (scheduler_active) {
+        policy = scheduler_get_policy();
+    } 
+    // clear queue (fresh exec)
+    else {
+        rq_init();
+    }
+
     // parse script names (between 1st arg and last)
-    int script_count = args_size - 2;
+    int script_count = policy_index - 1;
     char *script_names[3];
     for (int i = 0; i < script_count; i++)
         script_names[i] = command_args[1 + i];
@@ -404,8 +416,42 @@ int exec(char *command_args[], int args_size) {
         }
     }
 
-    // all scripts loaded, pass to scheduler
-    run_scheduler(policy);
+    // if background mode
+    if (background && !scheduler_active) {
+
+        FILE *tmp = tmpfile();
+        if (!tmp) return 1;
+
+        char line[1000];
+
+        // read remaining batch input and turn into prog0
+        while (fgets(line, sizeof(line), stdin)) {
+            fputs(line, tmp);
+        }
+
+        rewind(tmp);
+
+        int batch_start, batch_len;
+
+        int load_res = load_script_lines(tmp, &batch_start, &batch_len);
+        fclose(tmp);
+
+        if (load_res != 0) return 1;
+
+        PCB *batch = pcb_create(batch_start, batch_len);
+        if (!batch) {
+            release_script_lines(batch_start, batch_len);
+            return 1;
+        }
+
+        // batch script must run FIRST
+        rq_enqueue_front(batch);
+    }
+
+    // pass to scheduler
+    if (!scheduler_active) {
+        run_scheduler(policy);
+    }
 
     return 0;
 }

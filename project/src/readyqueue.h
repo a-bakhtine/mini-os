@@ -10,6 +10,7 @@ void rq_enqueue(PCB *p);
 void rq_enqueue_sjf(PCB *p);
 void rq_enqueue_score(PCB *p);
 void rq_age_all();
+void rq_enqueue_front(PCB *p);
 
 PCB *rq_dequeue();
 PCB *rq_peek();

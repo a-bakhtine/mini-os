@@ -72,37 +72,62 @@ void rq_enqueue_sjf(PCB *p) {
 // for aging scheduler
 void rq_enqueue_score(PCB *p) {
     PCB *curr;
-
+    
     if (!p)
-        return;
+    return;
     p->next = NULL;
-
+    
     // empty queue
     if (rq_head == NULL) { 
         rq_head = rq_tail = p; 
         return; 
     }
-
+    
     // new node has lowest score = highest priority, insert @ front
     if (p->score < rq_head->score) {
         p->next = rq_head;
         rq_head = p;
         return;
     }
-
+    
     // iterate thru nodes until next node has higher score, then insert
     curr = rq_head;
     while (curr->next != NULL && curr->next->score <= p->score) {
         curr = curr->next;
     }
-
+    
     p->next = curr->next;
     curr->next = p;
-
+    
     // update tail if inserted @ back
     if (p->next == NULL) 
-        rq_tail = p;
+    rq_tail = p;
+    
+}
 
+void rq_enqueue_front(PCB *p) {
+    if (!p) 
+        return;
+
+    // check if queue empty
+    if (rq_head == NULL) {
+        p->next = NULL;
+        rq_head = rq_tail = p;
+        return;
+    }
+
+    // push onto front
+    p->next = rq_head;
+    rq_head = p;
+}
+
+// age all PCBs that are waiting (for running AGING scheduler)
+void rq_age_all() {
+    PCB *curr;
+    for (curr = rq_head; curr != NULL; curr = curr->next) {
+        if (curr->score > 0)
+            curr->score--;
+    }
 }
 
 // remove and return process @front of queue
@@ -125,14 +150,5 @@ PCB *rq_dequeue() {
 
 PCB *rq_peek() {
     return rq_head;
-}
-
-// age all PCBs that are waiting (for running AGING scheduler)
-void rq_age_all() {
-    PCB *curr;
-    for (curr = rq_head; curr != NULL; curr = curr->next) {
-        if (curr->score > 0)
-            curr->score--;
-    }
 }
 

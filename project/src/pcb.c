@@ -7,12 +7,12 @@ PCB *pcb_create(int start, int scriptLength) {
     if (p == NULL) 
         return NULL;
 
-    p -> pid = next_pid++;
-    p -> start = start;
-    p -> scriptLength = scriptLength;
-    p -> pc = start;
+    p->pid = next_pid++;
+    p->start = start;
+    p->scriptLength = scriptLength;
+    p->pc = start;
 
-    p -> next = NULL;
+    p->next = NULL;
 
     return p;
 }

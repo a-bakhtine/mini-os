@@ -1,8 +1,10 @@
 #include "readyqueue.h"
+// RQ is a FIFO linked list
 
 PCB *rq_head = NULL;
 PCB *rq_tail = NULL;
 
+// resets queue
 void rq_init() {
     rq_head = NULL;
     rq_tail = NULL;
@@ -12,21 +14,26 @@ int rq_is_empty() {
     return rq_head == NULL;
 }
 
+// add process to back of queue
 void rq_enqueue(PCB *p) {
     if (p == NULL)
         return;
 
-    p -> next = NULL;
+    p->next = NULL;
 
-    if (rq_tail == NULL) { // empty queue
+    // check empty queue
+    if (rq_tail == NULL) { 
         rq_head = p;
         rq_tail = p;
-    } else {
-        rq_tail -> next = p;
+    } 
+    // append 
+    else {
+        rq_tail->next = p;
         rq_tail = p;
     }
 }
 
+// remove and return process @front of queue
 PCB *rq_dequeue() {
     if (rq_head == NULL)
         return NULL;
@@ -34,10 +41,11 @@ PCB *rq_dequeue() {
     PCB *p = rq_head;
     rq_head = rq_head->next;
 
-    if (rq_head == NULL) // queue became empty
+    // check if queue empty
+    if (rq_head == NULL) 
         rq_tail = NULL;
 
-    p -> next = NULL; // detach
+    p->next = NULL; 
     return p;
 }
 

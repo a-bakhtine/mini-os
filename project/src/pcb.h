@@ -9,7 +9,7 @@ typedef struct PCB {
     int start; // start index of script_store
     int scriptLength; // # of lines 
     int pc; // index of next instruction (starts at start)
-    int score; // job lenth of score for AGING scheduler
+    int score; // job length of score for AGING scheduler
     struct PCB *next; // link for ready queue
 } PCB;
 

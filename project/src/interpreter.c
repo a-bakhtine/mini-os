@@ -4,13 +4,13 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/wait.h>
+
 #include "shellmemory.h"
-#include "shell.h"
 #include "pcb.h"
 #include "readyqueue.h"
 #include "scheduler.h"
+
 
 int MAX_ARGS_SIZE = 7;
 
@@ -22,7 +22,7 @@ int badcommand() {
 // For source command only
 int badcommand_file_DNE() {
     printf("Bad command: File not found\n");
-    return 3;
+    return 1;
 }
 
 int badcommand_specific(char *value) {
@@ -43,7 +43,6 @@ int is_alphanumeric(const char *s) {
     }
     return 1; // is alphanum
 }
-
 
 int help();
 int quit();
@@ -138,24 +137,26 @@ int interpreter(char *command_args[], int args_size) {
 int help() {
 
     // note the literal tab characters here for alignment
-    char help_string[] = "COMMAND			DESCRIPTION\n \
-help			Displays all the commands\n \
-quit			Exits / terminates the shell with “Bye!”\n \
-set VAR STRING		Assigns a value to shell memory\n \
-print VAR		Displays the STRING assigned to VAR\n \
-source SCRIPT.TXT	Executes the file SCRIPT.TXT\n \
-echo STRING            Display STRING or value of $VAR\n \
-my_ls                  Displays all files present in the current directory\n \
-my_mkdir STRING        Creates new directory with name STRING in the current directory\n \
-my_touch STRING        Creates a new empty file in the current directory\n \
-my_cd STRING           Changes the current directory to directory STRING\n \
-run COMMAND            Run command to perform testcases\n \
-exec p1 p2 p3 POLICY   Runs multiple processes (1-3) concurrently with given POLICY";
+    char help_string[] = "COMMAND			           DESCRIPTION\n \
+help			            Displays all the commands\n \
+quit			            Exits / terminates the shell with “Bye!”\n \
+set VAR STRING		            Assigns a value to shell memory\n \
+print VAR		            Displays the STRING assigned to VAR\n \
+source SCRIPT.TXT	            Executes the file SCRIPT.TXT\n \
+echo STRING                        Display STRING or value of $VAR\n \
+my_ls                              Displays all files present in the current directory\n \
+my_mkdir STRING                    Creates new directory with name STRING in the current directory\n \
+my_touch STRING                    Creates a new empty file in the current directory\n \
+my_cd STRING                       Changes the current directory to directory STRING\n \
+run COMMAND                        Run command to perform testcases\n \
+exec p1 [p2 p3] POLICY [#] [MT]    Run 1-3 processes with the given scheduling policy.\n \
+                                   Add # to run in the background, MT to use multiple threads.\n";
     printf("%s\n", help_string);
     return 0;
 }
 
 int quit() {
+    scheduler_mt_stop_and_join();
     printf("Bye!\n");
     exit(0);
 }
@@ -327,18 +328,40 @@ int run(char *command_args[], int args_size) {
 }
 
 void cleanup_loaded_scripts(int frame_starts[], int frame_lens[], PCB *pcbs[], int scripts_loaded, int total) {
-    rq_init();
+    if (scheduler_mt_enabled()) {
+        scheduler_rq_init();
+    } else {
+        rq_init();
+    }
+
     // release script mem
     for (int i = scripts_loaded - 1; i >= 0; i--)
         release_script_lines(frame_starts[i], frame_lens[i]);
     // destroy any created PCBs 
     for (int i = 0; i < total; i++)
-        if (pcbs[i]) pcb_destroy(pcbs[i]);
+        if (pcbs[i]) 
+            pcb_destroy(pcbs[i]);
 }
 
 int exec(char *command_args[], int args_size) {
-    int background = (strcmp(command_args[args_size - 1], "#") == 0);
-    int policy_index = background ? args_size - 2 : args_size - 1;
+    // check if multithread flag @ end
+    int mt = (strcmp(command_args[args_size - 1], "MT") == 0);
+
+    // check if # flag last / second last
+    int background = 0;
+    if (mt) {
+        if (args_size >= 2 && strcmp(command_args[args_size - 2], "#") == 0) 
+            background = 1;
+    } else {
+        if (strcmp(command_args[args_size - 1], "#") == 0) 
+            background = 1;
+    }
+
+    int policy_index;
+    if (mt && background) policy_index = args_size - 3;
+    else if (mt && !background) policy_index = args_size - 2;
+    else if (!mt && background) policy_index = args_size - 2;
+    else policy_index = args_size - 1;
 
     // parse policy (last argument)
     Policy policy = parse_policy(command_args[policy_index]);
@@ -355,8 +378,17 @@ int exec(char *command_args[], int args_size) {
         rq_init();
     }
 
+    if (mt && !scheduler_active) {
+        scheduler_mt_enable();
+    }
+
     // parse script names (between 1st arg and last)
     int script_count = policy_index - 1;
+
+    // check if too little/many scripts
+    if (script_count < 1 || script_count > 3)
+        return 1;
+
     char *script_names[3];
     for (int i = 0; i < script_count; i++)
         script_names[i] = command_args[1 + i];
@@ -406,13 +438,23 @@ int exec(char *command_args[], int args_size) {
             return 1; 
         }
 
-        // enqueue
-        if (policy == SJF) {
-            rq_enqueue_sjf(pcbs[i]);
-        } else if (policy == AGING) {
-            rq_enqueue_score(pcbs[i]);
+        if (scheduler_mt_enabled()) {
+            scheduler_rq_enqueue(pcbs[i]); // round robin MT
         } else {
-            rq_enqueue(pcbs[i]);
+            if (policy == SJF) {
+                rq_enqueue_sjf(pcbs[i]);
+            } else if (policy == AGING) {
+                    // check if active run
+                    if (scheduler_active) {
+                        rq_enqueue_score(pcbs[i]);
+                    } 
+                    // initial load meant to preserve order
+                    else {
+                        rq_enqueue(pcbs[i]); 
+                    }
+            } else {
+                rq_enqueue(pcbs[i]);
+            }
         }
     }
 
@@ -420,7 +462,8 @@ int exec(char *command_args[], int args_size) {
     if (background && !scheduler_active) {
 
         FILE *tmp = tmpfile();
-        if (!tmp) return 1;
+        if (!tmp)
+            return 1;
 
         char line[1000];
 
@@ -436,7 +479,8 @@ int exec(char *command_args[], int args_size) {
         int load_res = load_script_lines(tmp, &batch_start, &batch_len);
         fclose(tmp);
 
-        if (load_res != 0) return 1;
+        if (load_res != 0) 
+            return 1;
 
         PCB *batch = pcb_create(batch_start, batch_len);
         if (!batch) {
@@ -444,14 +488,18 @@ int exec(char *command_args[], int args_size) {
             return 1;
         }
 
-        // batch script must run FIRST
-        rq_enqueue_front(batch);
+        if (scheduler_mt_enabled()) {
+            scheduler_rq_enqueue_front(batch);
+        } else {
+            rq_enqueue_front(batch); 
+        }
     }
 
-    // pass to scheduler
+    
+    // pass to scheduler ONLY if top-level
     if (!scheduler_active) {
         run_scheduler(policy);
     }
-
+    
     return 0;
 }

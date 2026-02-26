@@ -74,7 +74,7 @@ void rq_enqueue_score(PCB *p) {
     PCB *curr;
     
     if (!p)
-    return;
+        return;
     p->next = NULL;
     
     // empty queue
@@ -84,7 +84,7 @@ void rq_enqueue_score(PCB *p) {
     }
     
     // new node has lowest score = highest priority, insert @ front
-    if (p->score < rq_head->score) {
+    if (p->score <= rq_head->score) {
         p->next = rq_head;
         rq_head = p;
         return;
@@ -92,7 +92,7 @@ void rq_enqueue_score(PCB *p) {
     
     // iterate thru nodes until next node has higher score, then insert
     curr = rq_head;
-    while (curr->next != NULL && curr->next->score <= p->score) {
+    while (curr->next != NULL && curr->next->score < p->score) {
         curr = curr->next;
     }
     
@@ -101,9 +101,10 @@ void rq_enqueue_score(PCB *p) {
     
     // update tail if inserted @ back
     if (p->next == NULL) 
-    rq_tail = p;
+        rq_tail = p;
     
 }
+
 
 void rq_enqueue_front(PCB *p) {
     if (!p) 
@@ -136,16 +137,53 @@ PCB *rq_dequeue() {
 
     if (rq_head == NULL)
         return NULL;
-
+    
     p = rq_head;
     rq_head = rq_head->next;
-
+    
     // check if queue empty
     if (rq_head == NULL) 
         rq_tail = NULL;
-
+    
     p->next = NULL; 
-    return p;
+        return p;
+}
+
+// scans ready queue and removes process w lowest score
+PCB* rq_dequeue_score() {
+    if (!rq_head) 
+        return NULL;
+
+    // assumption = head process is the best candidate
+    PCB *best = rq_head;
+    PCB *best_prev = NULL;
+
+    PCB *prev = rq_head;
+    PCB *curr = rq_head->next;
+
+    // find lowest score
+    while (curr) {
+        if (curr->score < best->score) {
+            best = curr;
+            best_prev = prev;
+        }
+        prev = curr;
+        curr = curr->next;
+    }
+
+    // remove best from queue
+    if (best_prev == NULL) { 
+        rq_head = best->next;
+    } else {
+        best_prev->next = best->next;
+    }
+
+    // if removed tail, update ptr
+    if (best == rq_tail) 
+        rq_tail = best_prev;
+
+    best->next = NULL; // detach before returning
+    return best;
 }
 
 PCB *rq_peek() {

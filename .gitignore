@@ -12,3 +12,4 @@ a.out
 A[0-9]*/
 test_[0-9]*.txt
 prog[0-9]*.txt
+tests.sh

@@ -3,18 +3,7 @@
 #include <stdio.h>
 #include "shellmemory.h"
 
-struct memory_struct {
-    char *var;
-    char *value;
-};
-
-struct memory_struct shellmemory[MEM_SIZE];
-
-// to store lines of a script (memory)
-static char *scriptStore[MAX_SCRIPT_LINES];
-static int scriptStoreTop = 0;
-
-// Helper functions
+// HELPERS
 int match(char *model, char *var) {
     int i, len = strlen(var), matchCount = 0;
     for (i = 0; i < len; i++) {
@@ -36,6 +25,15 @@ void newline_trim(char *s) {
         }
     }
 }
+
+
+// SHELL MEMORY
+struct memory_struct {
+    char *var;
+    char *value;
+};
+
+struct memory_struct shellmemory[MEM_SIZE];
 
 // shell memory functions
 void mem_init(){
@@ -81,25 +79,32 @@ char *mem_get_value(char *var_in) {
     return "Variable does not exist";
 }
 
-// load script into the global array
-int load_script_lines(FILE *file, int *start, int *scriptLength) {
 
+// SCRIPT STORE
+
+// to store lines of a script (memory)
+char *scriptStore[MAX_SCRIPT_LINES];
+int scriptStoreTop = 0;
+
+// reads all lines from a file into global script store, sets *start and *scriptLength 
+int load_script_lines(FILE *file, int *start, int *scriptLength) {
     if (!file || !start || !scriptLength)
         return 1;
 
     *start = scriptStoreTop;
     *scriptLength = 0;
 
-    char line[MAX_LINE_LEN + 2];
-
+    char line[MAX_LINE_LEN + 2]; // +1 for '\n', +1 for '\0'
     while (fgets(line, sizeof(line), file)) {
         newline_trim(line);
 
+        // check if out of space
         if (scriptStoreTop >= MAX_SCRIPT_LINES) {
-            return 1;   // out of space
+            return 1;
         }
 
         scriptStore[scriptStoreTop] = strdup(line);
+        // check if out of memory
         if (!scriptStore[scriptStoreTop])
             return 1;
 
@@ -110,15 +115,14 @@ int load_script_lines(FILE *file, int *start, int *scriptLength) {
     return 0;
 }
 
-// getter function
+// returns the script line @ index i / NULL (out of bounds)
 char *get_script_line(int i) {
     if (i < 0 || i >= scriptStoreTop) return NULL;
     return scriptStore[i];
 }
 
-// release function
+// frees script lines in range [start, start+scriptLength]
 void release_script_lines(int start, int scriptLength) {
-
     int end = start + scriptLength;
 
     for (int i = start; i < end; i++) {
@@ -126,7 +130,7 @@ void release_script_lines(int start, int scriptLength) {
         scriptStore[i] = NULL;
     }
 
-    // simple rollback allocator (perfect for source stage)
+    // if range @ top of store, rollback allocator ptr
     if (end == scriptStoreTop) {
         scriptStoreTop = start;
     }

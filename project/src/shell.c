@@ -6,13 +6,14 @@
 #include "interpreter.h"
 #include "shellmemory.h"
 #include "readyqueue.h"
+#include "scheduler.h"
 
 int parseOneCommand(char ui[]);
 int parseInput(char ui[]);
 
 // start of everything
 int main(int argc, char *argv[]) {
-    printf("Shell version 1.4 created December 2024\n\n");
+    printf("Shell version 1.5 created Dec 2025\n");
     fflush(stdout);
 
     char prompt = '$'; // shell prompt
@@ -32,11 +33,14 @@ int main(int argc, char *argv[]) {
         if (mode) {
             printf("%c ", prompt);
         }
-        // here you should check the unistd library 
-        // so that you can find a way to not display $ in the batch mode
         if (fgets(userInput, MAX_USER_INPUT-1, stdin) == NULL) {
-           break; 
+            // EOF reached: if MT workers still running, wait for finish before exit
+            if (scheduler_mt_enabled()) {
+                scheduler_mt_stop_and_join();
+            }
+            break;
         }
+
         errorCode = parseInput(userInput);
         if (errorCode == -1) exit(99);	// ignore all other errors
         memset(userInput, 0, sizeof(userInput));

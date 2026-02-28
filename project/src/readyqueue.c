@@ -4,17 +4,21 @@
 PCB *rq_head = NULL;
 PCB *rq_tail = NULL;
 
+
+// CORE 
 // resets queue
 void rq_init() {
     rq_head = NULL;
     rq_tail = NULL;
 }
 
+// return 1 if queue empty, else 0
 int rq_is_empty() {
     return rq_head == NULL;
 }
 
-// add process to back of queue
+// ENQUEUES
+// add process to back of queue (FIFO)
 void rq_enqueue(PCB *p) {
     if (p == NULL)
         return;
@@ -33,7 +37,7 @@ void rq_enqueue(PCB *p) {
     }
 }
 
-// sorted enqueue for SJF
+// insert a process in sorted order by script length (shortest first) for SJF
 void rq_enqueue_sjf(PCB *p) {
     PCB *curr;
 
@@ -68,8 +72,7 @@ void rq_enqueue_sjf(PCB *p) {
         rq_tail = p;
 }
 
-// sorted enqueue by score (lowest score = highest priority)
-// for aging scheduler
+// insert a process in sorted order by score (lowest score = highest priority) for AGING 
 void rq_enqueue_score(PCB *p) {
     PCB *curr;
     
@@ -105,7 +108,7 @@ void rq_enqueue_score(PCB *p) {
     
 }
 
-
+// insert process @ front of RQ
 void rq_enqueue_front(PCB *p) {
     if (!p) 
         return;
@@ -122,38 +125,30 @@ void rq_enqueue_front(PCB *p) {
     rq_head = p;
 }
 
-// age all PCBs that are waiting (for running AGING scheduler)
-void rq_age_all() {
-    PCB *curr;
-    for (curr = rq_head; curr != NULL; curr = curr->next) {
-        if (curr->score > 0)
-            curr->score--;
-    }
-}
-
-// remove and return process @front of queue
+// DEQUEUES
+// remove and return process @ front of queue
 PCB *rq_dequeue() {
     PCB *p;
-
+    
     if (rq_head == NULL)
-        return NULL;
+    return NULL;
     
     p = rq_head;
     rq_head = rq_head->next;
     
     // check if queue empty
     if (rq_head == NULL) 
-        rq_tail = NULL;
+    rq_tail = NULL;
     
     p->next = NULL; 
-        return p;
+    return p;
 }
 
-// scans ready queue and removes process w lowest score
+// removes and returns the process w/ the lowest score (for AGING)
 PCB* rq_dequeue_score() {
     if (!rq_head) 
-        return NULL;
-
+    return NULL;
+    
     // assumption = head process is the best candidate
     PCB *best = rq_head;
     PCB *best_prev = NULL;
@@ -177,16 +172,21 @@ PCB* rq_dequeue_score() {
     } else {
         best_prev->next = best->next;
     }
-
+    
     // if removed tail, update ptr
     if (best == rq_tail) 
-        rq_tail = best_prev;
-
+    rq_tail = best_prev;
+    
     best->next = NULL; // detach before returning
     return best;
 }
 
-PCB *rq_peek() {
-    return rq_head;
+// AGING
+// decrement the score of all waiting processes by 1 s.t. min=0 (for AGING)
+void rq_age_all() {
+    PCB *curr;
+    for (curr = rq_head; curr != NULL; curr = curr->next) {
+        if (curr->score > 0)
+            curr->score--;
+    }
 }
-

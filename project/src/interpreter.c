@@ -11,9 +11,9 @@
 #include "readyqueue.h"
 #include "scheduler.h"
 
+#define MAX_ARGS_SIZE 7
 
-int MAX_ARGS_SIZE = 7;
-
+// HELPERS
 int badcommand() {
     printf("Unknown Command\n");
     return 1;
@@ -56,7 +56,7 @@ int my_touch(char *value);
 int my_cd(char *value);
 int run(char *command_args[], int args_size);
 int exec(char *command_args[], int args_size);
-int badcommand_file_DNE();
+void cleanup_loaded_scripts(int frame_starts[], int frame_lens[], PCB *pcbs[], int scripts_loaded, int total);
 
 // Interpret commands and their arguments
 int interpreter(char *command_args[], int args_size) {
@@ -156,6 +156,14 @@ exec p1 [p2 p3] POLICY [#] [MT]    Run 1-3 processes with the given scheduling p
 }
 
 int quit() {
+    // check if quit executed by worker thread (dont exit process)
+    if (scheduler_mt_enabled() && scheduler_mt_is_worker_thread()) {
+        printf("Bye!\n");
+        fflush(stdout);
+         return 0;
+    }
+
+    // main thread: normal exit
     scheduler_mt_stop_and_join();
     printf("Bye!\n");
     exit(0);
@@ -327,7 +335,9 @@ int run(char *command_args[], int args_size) {
 
 }
 
+// rolls back all loaded scripts and PCBs on failed exec
 void cleanup_loaded_scripts(int frame_starts[], int frame_lens[], PCB *pcbs[], int scripts_loaded, int total) {
+    // check if need thread-safe / single-thread reset
     if (scheduler_mt_enabled()) {
         scheduler_rq_init();
     } else {
@@ -343,7 +353,10 @@ void cleanup_loaded_scripts(int frame_starts[], int frame_lens[], PCB *pcbs[], i
             pcb_destroy(pcbs[i]);
 }
 
+// load and run 1-3 scripts under provided scheduling policy + flags
+// flags: (#) background execution, (MT) multithreaded execution
 int exec(char *command_args[], int args_size) {
+    // PARSE FLAGS (POLICY, #, MT) FROM END OF ARGS
     // check if multithread flag @ end
     int mt = (strcmp(command_args[args_size - 1], "MT") == 0);
 
@@ -357,35 +370,37 @@ int exec(char *command_args[], int args_size) {
             background = 1;
     }
 
+    // extract policy
     int policy_index;
     if (mt && background) policy_index = args_size - 3;
     else if (mt && !background) policy_index = args_size - 2;
     else if (!mt && background) policy_index = args_size - 2;
     else policy_index = args_size - 1;
 
-    // parse policy (last argument)
     Policy policy = parse_policy(command_args[policy_index]);
     if (policy == INVALID)
         return 1;
 
-    // nested execs use same policy as running one
-    int scheduler_active = scheduler_is_active();
-    if (scheduler_active) {
-        policy = scheduler_get_policy();
-    } 
-    // clear queue (fresh exec)
-    else {
-        rq_init();
-    }
 
+    // SCHEDULER STATE
+    int scheduler_active = scheduler_is_active();
+    int top_level_mt = (mt && !scheduler_active);
+
+    // check if nested exec (inherit running policy)
+    if (scheduler_active) policy = scheduler_get_policy();
+    // clear queue (fresh exec)
+    else rq_init();
+
+    // hold workers until all scripts loaded
     if (mt && !scheduler_active) {
         scheduler_mt_enable();
+        scheduler_mt_pause_workers();
     }
 
-    // parse script names (between 1st arg and last)
-    int script_count = policy_index - 1;
 
-    // check if too little/many scripts
+    // VALIDATE SCRIPTS
+    // parse script names and check if right amount (1-3)
+    int script_count = policy_index - 1;
     if (script_count < 1 || script_count > 3)
         return 1;
 
@@ -401,6 +416,8 @@ int exec(char *command_args[], int args_size) {
         }
     }
 
+
+    // LOAD SCRIPTS AND ENQUEUE
     // track loaded scripts (to cleanup if fail)
     int frame_starts[3] = {0};
     int frame_lens[3] = {0};
@@ -438,27 +455,27 @@ int exec(char *command_args[], int args_size) {
             return 1; 
         }
 
-        if (scheduler_mt_enabled()) {
-            scheduler_rq_enqueue(pcbs[i]); // round robin MT
+       if (scheduler_mt_enabled()) {
+            // check if loading (no broadcast)
+            if (top_level_mt) rq_enqueue(pcbs[i]); 
+            // nested exec (so wakeup workers)
+            else scheduler_rq_enqueue(pcbs[i]);
         } else {
             if (policy == SJF) {
                 rq_enqueue_sjf(pcbs[i]);
             } else if (policy == AGING) {
-                    // check if active run
-                    if (scheduler_active) {
-                        rq_enqueue_score(pcbs[i]);
-                    } 
-                    // initial load meant to preserve order
-                    else {
-                        rq_enqueue(pcbs[i]); 
-                    }
+                    // check if active run (sort by score)
+                    if (scheduler_active) rq_enqueue_score(pcbs[i]);
+                    // initial load (preserve order)
+                    else rq_enqueue(pcbs[i]); 
             } else {
                 rq_enqueue(pcbs[i]);
             }
         }
     }
 
-    // if background mode
+
+    // BACKGROUND MODE (load remaining batch input as prog0)
     if (background && !scheduler_active) {
 
         FILE *tmp = tmpfile();
@@ -489,14 +506,22 @@ int exec(char *command_args[], int args_size) {
         }
 
         if (scheduler_mt_enabled()) {
-            scheduler_rq_enqueue_front(batch);
+            if (top_level_mt) rq_enqueue(batch);
+            else scheduler_rq_enqueue(batch);
         } else {
             rq_enqueue_front(batch); 
         }
     }
 
-    
-    // pass to scheduler ONLY if top-level
+    // LAUNCH
+
+    // MT: start workers ONLY after all scripts and prog0 are enqueued
+    if (scheduler_mt_enabled() && !scheduler_active) {
+            mt_start_threads_if_needed(); // start threads if not started
+            scheduler_mt_resume_workers(); // release gate + wake
+    }
+
+    // only top-level exec triggers scheduler
     if (!scheduler_active) {
         run_scheduler(policy);
     }

@@ -44,6 +44,7 @@ int is_alphanumeric(const char *s) {
     return 1; // is alphanum
 }
 
+// DECLARATIONS
 int help();
 int quit();
 int set(char *var, char *value);
@@ -180,6 +181,7 @@ int print(char *var) {
     return 0;
 }
 
+// loads and runs a script file as a single process while under FCFS
 int source(char *script) {
     int start, scriptLength, load_status;
     PCB *proc;
@@ -194,7 +196,8 @@ int source(char *script) {
         return load_status;
 
     proc = pcb_create(start, scriptLength);
-    if (proc == NULL) { // error
+    // check if need to cleanup on PCB allocation fail
+    if (proc == NULL) {
         release_script_lines(start, scriptLength);
         return 1;
     }

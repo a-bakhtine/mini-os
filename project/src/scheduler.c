@@ -52,16 +52,16 @@ Policy parse_policy(const char *s) {
 
 // MULTITHREADING FUNCTIONS
 // enables multithreaded scheduling mode
-void scheduler_mt_enable(void) { 
+void scheduler_mt_enable() { 
     mt_enabled = 1; 
 }
 
 // returns 1 if multithreaded mode enabled, else 0
-int  scheduler_mt_enabled(void) { 
+int  scheduler_mt_enabled() { 
     return mt_enabled; 
 }
 
-int scheduler_mt_is_worker_thread(void) {
+int scheduler_mt_is_worker_thread() {
     if (!mt_threads_started) return 0;
     pthread_t self = pthread_self();
     for (int i = 0; i < NUM_WORKERS; i++) {
@@ -196,6 +196,12 @@ void run_rr_st(int time_quantum) {
         // run up to time_quantum lines of this process
         while (p->pc < end && lines_executed < time_quantum) {
             line = get_pcb_script_line(p);
+
+            if (page_fault_happened()) {
+                clear_page_fault_flag();
+                break;
+            }
+
             if (line != NULL && strlen(line) > 0) parseInput(line);
             p->pc++;
             lines_executed++;
@@ -255,6 +261,12 @@ void *worker_loop(void *unused_arg) {
         // run up to rr_quantum lines / script end
         while (p->pc < end && lines_executed < rr_quantum) {
             line = get_pcb_script_line(p);
+            
+            if (page_fault_happened()) {
+                clear_page_fault_flag();
+                break;
+            }
+
             if (line && strlen(line) > 0) {
                 // lock around interpreter bc not thread-safe
                 pthread_mutex_lock(&interpreter_mutex);
@@ -291,7 +303,7 @@ void *worker_loop(void *unused_arg) {
 
 // THREAD LIFECYCLE BUSINESS
 // spawns worker threads the first time it's called
-void mt_start_threads_if_needed(void) {
+void mt_start_threads_if_needed() {
     if (mt_threads_started)
         return;
 
@@ -305,7 +317,7 @@ void mt_start_threads_if_needed(void) {
 }
 
 // signals all worker threads that new work might be available in RQ
-void mt_notify_work(void) {
+void mt_notify_work() {
     if (!mt_threads_started) return;
 
     pthread_mutex_lock(&rq_mutex);
@@ -314,14 +326,14 @@ void mt_notify_work(void) {
 }
 
 // pauses all worker threads by preventing them from dequeuing new processes
-void scheduler_mt_pause_workers(void) {
+void scheduler_mt_pause_workers() {
     pthread_mutex_lock(&rq_mutex);
     mt_can_run = 0;
     pthread_mutex_unlock(&rq_mutex);
 }
 
 // resumes all paused worker threads and signals them to start processing
-void scheduler_mt_resume_workers(void) {
+void scheduler_mt_resume_workers() {
     pthread_mutex_lock(&rq_mutex);
     mt_can_run = 1;
     pthread_cond_broadcast(&rq_has_work);
@@ -329,7 +341,7 @@ void scheduler_mt_resume_workers(void) {
 }
 
 // tells all worker threads to stop (waits for them to finish then reset scheduler state)
-void scheduler_mt_stop_and_join(void) {
+void scheduler_mt_stop_and_join() {
     if (!mt_threads_started)
         return;
 

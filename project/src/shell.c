@@ -13,7 +13,11 @@ int parseInput(char ui[]);
 
 // start of everything
 int main(int argc, char *argv[]) {
-    printf("Shell version 1.5 created Dec 2025\n");
+    (void) argc;
+    (void) argv;
+
+    printf("Frame Store Size = %d; Variable Store Size = %d\n",
+        FRAME_STORE_SIZE, VAR_STORE_SIZE);
     fflush(stdout);
 
     char prompt = '$'; // shell prompt

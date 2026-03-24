@@ -199,8 +199,8 @@ int source(char *script) {
     // init and setup readyqueue
     rq_enqueue(proc);
 
-    // FCFS scheduler
-    run_scheduler(FCFS);
+    // RR scheduler
+    run_scheduler(RR);
 
     return 0;
 }

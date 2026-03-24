@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-pthread
+CFLAGS=-pthread -Wall -Wextra -D FRAME_STORE_SIZE=$(framesize) -D VAR_STORE_SIZE=$(varmemsize)
 FMT=indent
 
 mysh: shell.c interpreter.c shellmemory.c pcb.c readyqueue.c scheduler.c

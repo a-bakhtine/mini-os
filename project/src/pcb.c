@@ -1,19 +1,20 @@
 #include "pcb.h"
+#include "shellmemory.h"
 
 int next_pid = 1; // pid counter
 
 // allocate and init new PCB for a script loaded at [start, start+scriptLength] 
-PCB *pcb_create(int start, int scriptLength) {
+PCB *pcb_create(ScriptInfo *script) {
     PCB *p = (PCB *)malloc(sizeof(PCB));
-    if (p == NULL) 
+    if (p == NULL || script == NULL) 
         return NULL;
 
     p->pid = next_pid++;
-    p->start = start;
-    p->scriptLength = scriptLength;
-    p->pc = start;
+    p->start = 0;
+    p->scriptLength = script->scriptLength;
+    p->pc = 0;
     p->score = p->scriptLength;
-
+    p->script = script;
     p->next = NULL;
 
     return p;
@@ -22,5 +23,7 @@ PCB *pcb_create(int start, int scriptLength) {
 // free PCB
 void pcb_destroy(PCB *p) {
     if (p)
+        if (p->script)
+            release_script(p->script);
         free(p);
 }

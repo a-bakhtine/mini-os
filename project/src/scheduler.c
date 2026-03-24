@@ -107,11 +107,10 @@ void run_fcfs() {
         if (p == NULL)
             break;
             
-        // end is 1 past last line index
-        end = p->start + p->scriptLength;
+        end = p->scriptLength;
 
         while (p->pc < end) {
-            line = get_script_line(p->pc);
+            line = get_pcb_script_line(p);
             
             // skip null lines
             if (line != NULL && strlen(line) > 0) {
@@ -120,7 +119,6 @@ void run_fcfs() {
             p->pc++;
         }
         
-        release_script_lines(p->start, p->scriptLength);
         pcb_destroy(p);
     }
 }
@@ -135,16 +133,14 @@ void run_sjf() {
         p = rq_dequeue();
         if (p == NULL) break;
 
-        // end is 1 past last line index
-        end = p->start + p->scriptLength;
+        end = p->scriptLength;
         while (p->pc < end) {
-            line = get_script_line(p->pc);
+            line = get_pcb_script_line(p);
             if (line != NULL && strlen(line) > 0) 
                 parseInput(line);
             p->pc++;
         }
 
-        release_script_lines(p->start, p->scriptLength);
         pcb_destroy(p);
     }
 }
@@ -160,12 +156,11 @@ void run_aging() {
         if (!p) 
         break;
         
-        // end is 1 past last line index
-        end = p->start + p->scriptLength;
+        end = p->scriptLength;
         
         // run 1 instruction from curr process
         if (p->pc < end) {
-            line = get_script_line(p->pc);
+            line = get_pcb_script_line(p);
             if (line && strlen(line) > 0) 
                 parseInput(line);
             p->pc++;
@@ -173,7 +168,6 @@ void run_aging() {
 
         // check if process finished, if yes free it
         if (p->pc >= end) {
-            release_script_lines(p->start, p->scriptLength);
             pcb_destroy(p);
         } 
         // else decrement scores of all waiting processes (if not 0 score)
@@ -196,13 +190,12 @@ void run_rr_st(int time_quantum) {
         if (p == NULL) 
             break;
 
-        // end is one past last line index
-        end = p->start + p->scriptLength;
+        end = p->scriptLength;
         lines_executed = 0;
 
         // run up to time_quantum lines of this process
         while (p->pc < end && lines_executed < time_quantum) {
-            line = get_script_line(p->pc);
+            line = get_pcb_script_line(p);
             if (line != NULL && strlen(line) > 0) parseInput(line);
             p->pc++;
             lines_executed++;
@@ -210,7 +203,6 @@ void run_rr_st(int time_quantum) {
 
         // process finishes, free it
         if (p->pc >= end) {
-            release_script_lines(p->start, p->scriptLength);
             pcb_destroy(p);
         } 
         // quantum expired, so requeue for next turn
@@ -227,6 +219,7 @@ void *worker_loop(void *unused_arg) {
     char* line;
     PCB *p;
     (void)unused_arg; // required bc pthread signature
+
     while (1) {
         // wait for work
         pthread_mutex_lock(&rq_mutex);
@@ -256,13 +249,12 @@ void *worker_loop(void *unused_arg) {
             continue;
         }
         
-        // end is 1 past last line index
-        end = p->start + p->scriptLength;
+        end = p->scriptLength;
         lines_executed = 0;
 
         // run up to rr_quantum lines / script end
         while (p->pc < end && lines_executed < rr_quantum) {
-            line = get_script_line(p->pc);
+            line = get_pcb_script_line(p);
             if (line && strlen(line) > 0) {
                 // lock around interpreter bc not thread-safe
                 pthread_mutex_lock(&interpreter_mutex);
@@ -275,13 +267,11 @@ void *worker_loop(void *unused_arg) {
         }
 
         pthread_mutex_lock(&rq_mutex);
-        active_workers--;                 // protected
+        active_workers--; 
 
         // check if process finished (free lines)
-        
         if (p->pc >= end) {
             pthread_mutex_unlock(&rq_mutex); 
-            release_script_lines(p->start, p->scriptLength);
             pcb_destroy(p);
             pthread_mutex_lock(&rq_mutex);
         } else {

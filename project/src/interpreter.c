@@ -57,7 +57,7 @@ int my_touch(char *value);
 int my_cd(char *value);
 int run(char *command_args[], int args_size);
 int exec(char *command_args[], int args_size);
-void cleanup_loaded_scripts(int frame_starts[], int frame_lens[], PCB *pcbs[], int scripts_loaded, int total);
+void cleanup_loaded_scripts(PCB *pcbs[], int total);
 
 // Interpret commands and their arguments
 int interpreter(char *command_args[], int args_size) {
@@ -183,22 +183,16 @@ int print(char *var) {
 
 // loads and runs a script file as a single process while under FCFS
 int source(char *script) {
-    int start, scriptLength, load_status;
+    ScriptInfo *loaded_script = load_script(script);
     PCB *proc;
-    FILE *p = fopen(script, "rt");
-    
-    if (p == NULL)
+
+    if (loaded_script == NULL)
         return badcommand_file_DNE();
 
-    load_status = load_script_lines(p, &start, &scriptLength);
-    fclose(p);
-    if (load_status != 0) 
-        return load_status;
-
-    proc = pcb_create(start, scriptLength);
+    proc = pcb_create(loaded_script);
     // check if need to cleanup on PCB allocation fail
     if (proc == NULL) {
-        release_script_lines(start, scriptLength);
+        release_script(loaded_script);
         return 1;
     }
 
@@ -339,7 +333,7 @@ int run(char *command_args[], int args_size) {
 }
 
 // rolls back all loaded scripts and PCBs on failed exec
-void cleanup_loaded_scripts(int frame_starts[], int frame_lens[], PCB *pcbs[], int scripts_loaded, int total) {
+void cleanup_loaded_scripts(PCB *pcbs[], int total) {
     // check if need thread-safe / single-thread reset
     if (scheduler_mt_enabled()) {
         scheduler_rq_init();
@@ -347,10 +341,7 @@ void cleanup_loaded_scripts(int frame_starts[], int frame_lens[], PCB *pcbs[], i
         rq_init();
     }
 
-    // release script mem
-    for (int i = scripts_loaded - 1; i >= 0; i--)
-        release_script_lines(frame_starts[i], frame_lens[i]);
-    // destroy any created PCBs 
+   // destroy any created PCBs 
     for (int i = 0; i < total; i++)
         if (pcbs[i]) 
             pcb_destroy(pcbs[i]);
@@ -411,66 +402,34 @@ int exec(char *command_args[], int args_size) {
     for (int i = 0; i < script_count; i++)
         script_names[i] = command_args[1 + i];
 
-    // check for duplicate script names 
-    for (int i = 0; i < script_count; i++) {
-        for (int j = i + 1; j < script_count; j++) {
-            if (strcmp(script_names[i], script_names[j]) == 0)
-                return 1;
-        }
-    }
-
-
     // LOAD SCRIPTS AND ENQUEUE
-    // track loaded scripts (to cleanup if fail)
-    int frame_starts[3] = {0};
-    int frame_lens[3] = {0};
     PCB *pcbs[3] = {NULL};
-    int scripts_loaded = 0;
 
     // load each script into memory, create its PCB, enqueue
     for (int i = 0; i < script_count; i++) {
-        FILE *script_file = fopen(script_names[i], "rt");
-        
-        // check if file found
-        if (!script_file) {
-            cleanup_loaded_scripts(frame_starts, frame_lens, pcbs, scripts_loaded, script_count);
-            return 1; 
+        ScriptInfo *loaded_script = load_script(script_names[i]);
+
+        if (!loaded_script) {
+            cleanup_loaded_scripts(pcbs, script_count);
+            return 1;
         }
 
-        int frame_start, frame_len;
-        int load_result = load_script_lines(script_file, &frame_start, &frame_len);
-        fclose(script_file);
-
-        // check if enough memory / load errors
-        if (load_result != 0) {
-            cleanup_loaded_scripts(frame_starts, frame_lens, pcbs, scripts_loaded, script_count);
-            return 1; 
-        }
-
-        frame_starts[i] = frame_start;
-        frame_lens[i] = frame_len;
-        scripts_loaded++;
-
-        pcbs[i] = pcb_create(frame_start, frame_len);
-        // check if PCB allocation worked
+        pcbs[i] = pcb_create(loaded_script);
         if (!pcbs[i]) {
-            cleanup_loaded_scripts(frame_starts, frame_lens, pcbs, scripts_loaded, script_count);
-            return 1; 
+            release_script(loaded_script);
+            cleanup_loaded_scripts(pcbs, script_count);
+            return 1;
         }
 
-       if (scheduler_mt_enabled()) {
-            // check if loading (no broadcast)
-            if (top_level_mt) rq_enqueue(pcbs[i]); 
-            // nested exec (so wakeup workers)
+        if (scheduler_mt_enabled()) {
+            if (top_level_mt) rq_enqueue(pcbs[i]);
             else scheduler_rq_enqueue(pcbs[i]);
         } else {
             if (policy == SJF) {
                 rq_enqueue_sjf(pcbs[i]);
             } else if (policy == AGING) {
-                    // check if active run (sort by score)
-                    if (scheduler_active) rq_enqueue_score(pcbs[i]);
-                    // initial load (preserve order)
-                    else rq_enqueue(pcbs[i]); 
+                if (scheduler_active) rq_enqueue_score(pcbs[i]);
+                else rq_enqueue(pcbs[i]);
             } else {
                 rq_enqueue(pcbs[i]);
             }
@@ -494,17 +453,21 @@ int exec(char *command_args[], int args_size) {
 
         rewind(tmp);
 
-        int batch_start, batch_len;
+        static int batch_counter = 0;
+        char batch_name[32];
+        ScriptInfo *batch_script;
+        PCB *batch;
 
-        int load_res = load_script_lines(tmp, &batch_start, &batch_len);
+        snprintf(batch_name, sizeof(batch_name), "prog0_%d", batch_counter++);
+        batch_script = load_script_from_FILE(tmp, batch_name);
         fclose(tmp);
 
-        if (load_res != 0) 
+        if (!batch_script)
             return 1;
 
-        PCB *batch = pcb_create(batch_start, batch_len);
+        batch = pcb_create(batch_script);
         if (!batch) {
-            release_script_lines(batch_start, batch_len);
+            release_script(batch_script);
             return 1;
         }
 

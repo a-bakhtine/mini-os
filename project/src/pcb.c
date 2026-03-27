@@ -10,7 +10,6 @@ PCB *pcb_create(ScriptInfo *script) {
         return NULL;
 
     p->pid = next_pid++;
-    p->start = 0;
     p->scriptLength = script->scriptLength;
     p->pc = 0;
     p->score = p->scriptLength;
@@ -22,8 +21,8 @@ PCB *pcb_create(ScriptInfo *script) {
 
 // free PCB
 void pcb_destroy(PCB *p) {
-    if (p)
-        if (p->script)
-            release_script(p->script);
+    if (p) {
+        if (p->script) release_script(p->script);
         free(p);
+    }
 }

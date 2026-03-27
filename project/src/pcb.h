@@ -8,8 +8,6 @@ typedef struct ScriptInfo ScriptInfo;
 
 typedef struct PCB {
     int pid;
-
-    int start; // start index of script_store
     int scriptLength; // # of lines 
     int pc; // index of next instruction (starts at start)
     int score; // job length of score for AGING scheduler

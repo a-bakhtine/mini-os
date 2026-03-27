@@ -181,7 +181,7 @@ int print(char *var) {
     return 0;
 }
 
-// loads and runs a script file as a single process while under FCFS
+// loads and runs a script file as a single process while under RR 
 int source(char *script) {
     ScriptInfo *loaded_script = load_script(script);
     PCB *proc;
@@ -197,6 +197,7 @@ int source(char *script) {
     }
 
     // init and setup readyqueue
+    rq_init();
     rq_enqueue(proc);
 
     // RR scheduler
@@ -415,8 +416,9 @@ int exec(char *command_args[], int args_size) {
         }
 
         pcbs[i] = pcb_create(loaded_script);
+        // check if pcb_create fails
         if (!pcbs[i]) {
-            release_script(loaded_script);
+            release_script(loaded_script); 
             cleanup_loaded_scripts(pcbs, script_count);
             return 1;
         }
@@ -453,6 +455,7 @@ int exec(char *command_args[], int args_size) {
 
         rewind(tmp);
 
+        // unique name per batch so script doesn't see it as dupe
         static int batch_counter = 0;
         char batch_name[32];
         ScriptInfo *batch_script;
@@ -471,6 +474,7 @@ int exec(char *command_args[], int args_size) {
             return 1;
         }
 
+        // enqueue prog0 @ front so runs first (or MT-safe enqueue)
         if (scheduler_mt_enabled()) {
             if (top_level_mt) rq_enqueue(batch);
             else scheduler_rq_enqueue(batch);

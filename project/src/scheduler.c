@@ -86,14 +86,6 @@ void scheduler_rq_enqueue(PCB *p) {
     pthread_mutex_unlock(&rq_mutex);
 }
 
-// enqueues a proces @ front of the RQ and wakes workers
-void scheduler_rq_enqueue_front(PCB *p) {
-    pthread_mutex_lock(&rq_mutex);
-    rq_enqueue_front(p);
-    pthread_cond_broadcast(&rq_has_work);
-    pthread_mutex_unlock(&rq_mutex);
-}
-
 // SINGLE-THREADED ONLY SCHEDULERS
 // run all enqueued process to completion in arrival order
 void run_fcfs() {
@@ -111,6 +103,12 @@ void run_fcfs() {
 
         while (p->pc < end) {
             line = get_pcb_script_line(p);
+
+            if (get_last_page_fault()) {
+                clear_page_fault_flag();
+                // retry same line after page is loaded
+                continue;
+            }
             
             // skip null lines
             if (line != NULL && strlen(line) > 0) {
@@ -136,6 +134,13 @@ void run_sjf() {
         end = p->scriptLength;
         while (p->pc < end) {
             line = get_pcb_script_line(p);
+
+            if (get_last_page_fault()) {
+                clear_page_fault_flag();
+                // retry same line after page loaded
+                continue;
+            } 
+
             if (line != NULL && strlen(line) > 0) 
                 parseInput(line);
             p->pc++;
@@ -161,9 +166,16 @@ void run_aging() {
         // run 1 instruction from curr process
         if (p->pc < end) {
             line = get_pcb_script_line(p);
-            if (line && strlen(line) > 0) 
-                parseInput(line);
-            p->pc++;
+            
+            if (get_last_page_fault()) {
+                clear_page_fault_flag();
+                continue;
+            } else {
+                if (line && strlen(line) > 0) 
+                    parseInput(line);
+                p->pc++;
+            }
+
         }
 
         // check if process finished, if yes free it
@@ -197,7 +209,7 @@ void run_rr_st(int time_quantum) {
         while (p->pc < end && lines_executed < time_quantum) {
             line = get_pcb_script_line(p);
 
-            if (page_fault_happened()) {
+            if (get_last_page_fault()) {
                 clear_page_fault_flag();
                 break;
             }
@@ -262,7 +274,7 @@ void *worker_loop(void *unused_arg) {
         while (p->pc < end && lines_executed < rr_quantum) {
             line = get_pcb_script_line(p);
             
-            if (page_fault_happened()) {
+            if (get_last_page_fault()) {
                 clear_page_fault_flag();
                 break;
             }
@@ -314,15 +326,6 @@ void mt_start_threads_if_needed() {
     for (int i = 0; i < NUM_WORKERS; i++) {
         pthread_create(&worker_threads[i], NULL, worker_loop, NULL);
     }
-}
-
-// signals all worker threads that new work might be available in RQ
-void mt_notify_work() {
-    if (!mt_threads_started) return;
-
-    pthread_mutex_lock(&rq_mutex);
-    pthread_cond_broadcast(&rq_has_work);
-    pthread_mutex_unlock(&rq_mutex);
 }
 
 // pauses all worker threads by preventing them from dequeuing new processes

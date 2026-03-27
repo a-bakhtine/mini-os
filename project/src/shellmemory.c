@@ -154,9 +154,8 @@ int evict_lru_frame() {
 
 
     // mark page as no longer in use in owner's page table
-    if (owner != NULL && victim_page >= 0 && victim_page < owner->numPages) {
+    if (owner != NULL && victim_page >= 0 && victim_page < owner->numPages)
         owner->pageTable[victim_page] = -1;
-    }
 
     // clear frame and metadata
     clear_frame_contents(victim);
@@ -173,12 +172,10 @@ int evict_lru_frame() {
 void check_page_loaded(ScriptInfo *script, int page_num) {
     int frame_num;
 
-    if (!script || page_num < 0 || page_num >= script->numPages)
-        return;
+    if (!script || page_num < 0 || page_num >= script->numPages) return;
 
     // check if exists in memory already
-    if (script->pageTable[page_num] != -1)
-        return;
+    if (script->pageTable[page_num] != -1) return;
 
     last_page_fault = 1;
 
@@ -192,8 +189,7 @@ void check_page_loaded(ScriptInfo *script, int page_num) {
 
     // no free frames so evict LRU and load into reclaimed frame
     frame_num = evict_lru_frame();
-    if (frame_num >= 0)
-        load_page_into_frame(script, page_num, frame_num);
+    if (frame_num >= 0) load_page_into_frame(script, page_num, frame_num);
 }
 
 // MEMORY FUNCTIONS
@@ -268,12 +264,10 @@ ScriptInfo *load_script_from_FILE(FILE *file, const char *script_name) {
     int line_count = 0;
     ScriptInfo *script = NULL;
 
-    if (!file || !script_name)
-        return NULL;
+    if (!file || !script_name) return NULL;
 
     // check if duplicate (script_name already loaded)
-    if (find_loaded_script(script_name) != NULL)
-        return NULL;
+    if (find_loaded_script(script_name) != NULL) return NULL;
 
     // read all lines to a dynm arr
     while (fgets(line, sizeof(line), file)) {
@@ -285,26 +279,22 @@ ScriptInfo *load_script_from_FILE(FILE *file, const char *script_name) {
         if (line_count == line_capacity) {
             int new_capacity = (line_capacity == 0) ? 8 : line_capacity * 2;
             char **new_lines = realloc(lines, new_capacity * sizeof(char *));
-            if (!new_lines)
-                goto fail;
+            if (!new_lines) goto fail;
             lines = new_lines;
             line_capacity = new_capacity;
         }
 
         copy = strdup(line);
-        if (!copy)
-            goto fail;
+        if (!copy) goto fail;
         lines[line_count++] = copy;
     }
 
     // build the ScriptInfo obj
     script = malloc(sizeof(ScriptInfo));
-    if (!script)
-        goto fail;
+    if (!script) goto fail;
 
     script->name = strdup(script_name);
-    if (!script->name)
-        goto fail;
+    if (!script->name) goto fail;
 
     script->scriptLength = line_count;
     script->numPages = (line_count + FRAME_SIZE - 1) / FRAME_SIZE;
@@ -315,20 +305,16 @@ ScriptInfo *load_script_from_FILE(FILE *file, const char *script_name) {
     if (script->numPages > 0) {
         // alloc page table and init all entries to -1
         script->pageTable = malloc(script->numPages * sizeof(int));
-        if (!script->pageTable)
-            goto fail;
+        if (!script->pageTable) goto fail;
 
         for (int i = 0; i < script->numPages; i++) {
             script->pageTable[i] = -1;
         }
 
         // load page 0
-        {
-            int first = alloc_frame();
-            if (first < 0)
-                goto fail;
-            load_page_into_frame(script, 0, first);
-        }
+        int first = alloc_frame();
+        if (first < 0) goto fail;
+        load_page_into_frame(script, 0, first);
 
         // load page 1 if exists
         if (script->numPages > 1) {
@@ -338,8 +324,7 @@ ScriptInfo *load_script_from_FILE(FILE *file, const char *script_name) {
         }
     }
 
-    if (loadedScriptCount >= MAX_SCRIPTS)
-        goto fail;
+    if (loadedScriptCount >= MAX_SCRIPTS) goto fail;
 
     // load the script
     loadedScripts[loadedScriptCount++] = script;
@@ -377,8 +362,7 @@ ScriptInfo *load_script(char *script_name) {
     FILE *file;
     ScriptInfo *script;
 
-    if (!script_name)
-        return NULL;
+    if (!script_name) return NULL;
 
     // check if already loaded
     script = find_loaded_script(script_name);
@@ -388,8 +372,7 @@ ScriptInfo *load_script(char *script_name) {
     }
 
     file = fopen(script_name, "rt");
-    if (!file)
-        return NULL;
+    if (!file) return NULL;
 
     script = load_script_from_FILE(file, script_name);
     fclose(file);
@@ -398,8 +381,7 @@ ScriptInfo *load_script(char *script_name) {
 
 // decr the refcount of script
 void release_script(ScriptInfo *script) {
-    if (!script)
-        return;
+    if (!script) return;
 
     if (script->refCount > 0)
         script->refCount--;
@@ -417,16 +399,13 @@ char *get_pcb_script_line(PCB *p) {
 
     last_page_fault = 0; // reset before each access
 
-    if (!p || !p->script)
-        return NULL;
-    if (p->pc < 0 || p->pc >= p->scriptLength)
-        return NULL;
+    if (!p || !p->script) return NULL;
+    if (p->pc < 0 || p->pc >= p->scriptLength) return NULL;
 
     page_num = p->pc / FRAME_SIZE; // page that holds line
     offset = p->pc % FRAME_SIZE; // line's pos in the page
 
-    if (page_num < 0 || page_num >= p->script->numPages)
-        return NULL;
+    if (page_num < 0 || page_num >= p->script->numPages) return NULL;
 
     // check if page not loaded 
     if (p->script->pageTable[page_num] == -1) {
@@ -437,8 +416,7 @@ char *get_pcb_script_line(PCB *p) {
     frame_num = p->script->pageTable[page_num];
     line_index = frame_num * FRAME_SIZE + offset;
 
-    if (line_index < 0 || line_index >= FRAME_STORE_SIZE)
-        return NULL;
+    if (line_index < 0 || line_index >= FRAME_STORE_SIZE) return NULL;
 
     // update LRU so the frame isn't evicted prematurely
     touch_frame(frame_num);
